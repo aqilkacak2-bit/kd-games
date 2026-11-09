@@ -261,6 +261,7 @@ window.KD_READY = () => {
   const begin = e => {
     if (e) e.preventDefault();
     document.getElementById('start').classList.add('gone');
+    if (window.KD_PRESENCE) window.KD_PRESENCE.enterGame();
     window.KD_GAME.start();
   };
   go.addEventListener('click', begin);
@@ -272,6 +273,7 @@ window.KD_SOUNDS={"snd_chat_reply":{"vol":1.0,"src":"data:audio/mpeg;base64,SUQz
 window.KD_ROOMS={"rm_title":{"w":320,"h":180,"bg":"spr_title_bg","vw":320,"vh":180,"list":[["obj_title",0.0,0.0,1.0,1.0]]},"rm_select":{"w":320,"h":180,"bg":"spr_select_bg","vw":320,"vh":180,"list":[["obj_game",8.0,8.0,1.0,1.0],["obj_select_lineup",0.0,0.0,1.0,1.0],["obj_player",40.0,150.0,1.0,1.0],["obj_solid",0.0,150.0,320.0,30.0],["obj_station_select",246.0,150.0,1.0,1.0],["obj_station_door_lab",300.0,150.0,1.0,1.0]]},"rm_showcase":{"w":1073,"h":373,"bg":"spr_showcase_bg","vw":640,"vh":360,"list":[["obj_game",8.0,8.0,1.0,1.0],["obj_player",120.0,332.0,1.0,1.0],["obj_solid",0.0,332.0,1073.0,41.0],["obj_solid",0.0,0.0,8.0,332.0],["obj_solid",1065.0,0.0,8.0,332.0],["obj_station_door_select",88.0,332.0,1.0,1.0],["obj_station_door_lab",1034.0,332.0,1.0,1.0],["obj_kd_girl_npc",280.0,332.0,1.0,1.0],["obj_kd_npc",940.0,332.0,-1.0,1.0],["obj_show_myfm",864.0,189.0,1.0,1.0],["obj_show_pendekar",369.0,167.0,1.0,1.0],["obj_show_lembah",531.0,178.0,1.0,1.0],["obj_show_wardrun",710.0,191.0,1.0,1.0],["obj_show_kracked",595.0,78.0,1.0,1.0]]},"rm_kl":{"w":960,"h":240,"bg":"spr_kl_sky","vw":320,"vh":180,"list":[["obj_game",8.0,8.0,1.0,1.0],["obj_kl_scenery",0.0,0.0,1.0,1.0],["obj_player",70.0,208.0,1.0,1.0],["obj_solid",0.0,208.0,960.0,32.0],["obj_solid",0.0,0.0,8.0,208.0],["obj_solid",952.0,0.0,8.0,208.0],["obj_ladder",470.0,120.0,24.0,88.0],["obj_station_door_select",40.0,208.0,1.0,1.0],["obj_station_door_lab",800.0,208.0,1.0,1.0],["obj_kd_npc",330.0,208.0,1.0,1.0],["obj_kd_girl_npc",560.0,208.0,-1.0,1.0],["obj_kd_npc",600.0,120.0,1.0,1.0],["obj_kd_girl_npc",880.0,208.0,-1.0,1.0],["obj_item_box",380.0,192.0,1.0,1.0],["obj_item_box",720.0,192.0,1.0,1.0],["obj_item_box",736.0,192.0,1.0,1.0]]},"rm_main":{"w":721,"h":373,"bg":"spr_lab_bg","vw":320,"vh":180,"list":[["obj_game",8.0,8.0,1.0,1.0],["obj_player",60.0,246.0,1.0,1.0],["obj_kd_girl_npc",330.0,246.0,-1.0,1.0],["obj_kd_npc",650.0,170.0,1.0,1.0],["obj_kd_girl_npc",420.0,357.0,1.0,1.0],["obj_solid",0.0,246.0,498.0,11.0],["obj_solid",498.0,170.0,223.0,87.0],["obj_solid",498.0,0.0,25.0,170.0],["obj_solid",0.0,357.0,721.0,16.0],["obj_solid",0.0,318.0,68.0,39.0],["obj_ladder",203.0,246.0,24.0,111.0],["obj_ladder",585.0,170.0,24.0,187.0],["obj_stairs",68.0,246.0,56.0,72.0],["obj_station_feed",238.0,246.0,1.0,1.0],["obj_station_discord",440.0,246.0,1.0,1.0],["obj_station_about",285.0,246.0,1.0,1.0],["obj_station_guilds",345.0,246.0,1.0,1.0],["obj_station_exp",160.0,246.0,1.0,1.0],["obj_station_bounty",545.0,357.0,1.0,1.0],["obj_station_stats",640.0,170.0,1.0,1.0],["obj_decor_bounty",522.0,314.0,1.0,1.0],["obj_station_door_select",24.0,246.0,1.0,1.0],["obj_station_door_range",100.0,357.0,1.0,1.0],["obj_station_door_roof",700.0,170.0,1.0,1.0]]},"rm_range":{"w":480,"h":180,"bg":"spr_range_bg","vw":320,"vh":180,"list":[["obj_game",8.0,8.0,1.0,1.0],["obj_player",40.0,150.0,1.0,1.0],["obj_solid",0.0,150.0,480.0,30.0],["obj_solid",200.0,128.0,80.0,6.0],["obj_station_door_back",24.0,150.0,1.0,1.0],["obj_target_dummy",300.0,150.0,1.0,1.0],["obj_target_dummy",360.0,150.0,1.0,1.0],["obj_target_dummy",430.0,150.0,1.0,1.0],["obj_target_dummy",240.0,128.0,1.0,1.0]]},"rm_rooftop":{"w":480,"h":180,"bg":"spr_rooftop_bg","vw":320,"vh":180,"list":[["obj_game",8.0,8.0,1.0,1.0],["obj_player",40.0,150.0,1.0,1.0],["obj_solid",0.0,150.0,480.0,30.0],["obj_solid",150.0,134.0,24.0,16.0],["obj_solid",300.0,138.0,32.0,12.0],["obj_station_door_back",24.0,150.0,1.0,1.0],["obj_kd_npc",240.0,150.0,1.0,1.0],["obj_kd_girl_npc",400.0,150.0,-1.0,1.0]]}};
 window.KD_ROOM_ORDER=["rm_title", "rm_select", "rm_showcase", "rm_kl", "rm_main", "rm_range", "rm_rooftop"];
 </script>
+<script src="/discord-presence.js"></script>
 <script>
 /* KDlab1 - web version of the GameMaker project (KD_cs / KDlab1).
    Runs at a fixed 60 steps per second, like the original.
@@ -758,6 +760,8 @@ const GL_ = {
     name: 'Builder', show_bubbles: true, show_log: true, bubble_time: 5, npc_replies: true,
     shader: 1, flash: 0, sfx_vol: 1, hum_on: true
 };
+
+const presence = window.KD_PRESENCE;
 
 const levelFromExp = e => Math.floor(Math.sqrt(e / 100)) + 1;
 const expForLevel = l => (l - 1) * (l - 1) * 100;
@@ -1469,11 +1473,12 @@ const G = {
         if (!busy && inB(x, y, this.chat_btn)) { textOpen('chat', '', 60); this.chat_typing = true; this.chat_text = ''; this.preOpened = true; }
         else if (this.settings_open && !this.name_editing) {
             const bx1 = this.set_x1 + this.set_w - 190, by1 = this.set_y1 + 76;
-            if (inR(x, y, bx1, by1, bx1 + 160, by1 + 34)) { textOpen('name', GL_.name, 16); this.name_editing = true; this.chat_text = GL_.name; this.preOpened = true; }
+            if (!presence?.user && inR(x, y, bx1, by1, bx1 + 160, by1 + 34)) { textOpen('name', GL_.name, 16); this.name_editing = true; this.chat_text = GL_.name; this.preOpened = true; }
         }
     },
     textSubmitted(kind, val) {
         if (kind === 'name') {
+            if (presence?.user) { this.name_editing = false; return; }
             if (val.replace(/ /g, '') !== '') GL_.name = val.slice(0, 16);
             this.name_editing = false;
             this.blockClickUntilRelease = true;
@@ -1558,7 +1563,9 @@ const G = {
                     if (inR(mx, my, bx1, by1, bx1 + 160, by1 + 34)) {
                         kdSfx('snd_ui_click');
                         switch (this.set_rows[r]) {
-                            case 'name': this.name_editing = true; this.chat_text = GL_.name; textOpen('name', GL_.name, 16); break;
+                            case 'name':
+                                if (presence?.user) { kdToast('Your name is provided by Discord.', rgb(150, 200, 255)); break; }
+                                this.name_editing = true; this.chat_text = GL_.name; textOpen('name', GL_.name, 16); break;
                             case 'bubbles': GL_.show_bubbles = !GL_.show_bubbles; break;
                             case 'log': GL_.show_log = !GL_.show_log; break;
                             case 'time': GL_.bubble_time = GL_.bubble_time === 3 ? 5 : GL_.bubble_time === 5 ? 8 : 3; break;
@@ -1705,6 +1712,9 @@ const G = {
         // name plates under everyone's feet: face, name, health
         for (const n of R.npcs) nameplate(n.x, n.y, n.npc_name, n.look, n.hp, n.hp_max, rgb(150, 200, 255), n.ko > 0);
         if (R.player) nameplate(R.player.x, R.player.y, GL_.name, R.player.look, R.player.hp, R.player.hp_max, GREEN, false);
+        if (presence) for (const peer of presence.players()) {
+            nameplate(peer.x, peer.y, peer.name, peer.state.look, 0, 0, rgb(150, 200, 255), false, false);
+        }
 
         if (GL_.show_bubbles) {
             for (const n of R.npcs) if (n.bubble_timer > 0) drawBubble(n.x, n.y - 36, n.bubble_text, Math.min(1, n.bubble_timer / 20));
@@ -1718,7 +1728,7 @@ const G = {
         setA(0.85); setC(DARK); rrect(16, 16, 336, 78, 12, false);
         setA(1); setC(GREEN); rrect(16, 16, 336, 78, 12, true);
         txt(28, 24, '<KD/>', Math.min(1.6, 76 / strW('<KD/>')));
-        setC(WHITE); txt(110, 24, GL_.name + '   Lv ' + lvl);
+        setC(WHITE); txt(110, 24, GL_.name + '   Lv ' + lvl, Math.min(1, 212 / strW(GL_.name + '   Lv ' + lvl)));
         setC(rgb(40, 46, 58)); rect(110, 50, 322, 62);
         setC(GREEN); rect(110, 50, 110 + 212 * clamp(fr, 0, 1), 62);
         setC(GREY); txt(110, 63, GL_.exp + ' / ' + next + ' EXP', 0.8);
@@ -1965,7 +1975,7 @@ const G = {
             let label = '', value = '';
             switch (this.set_rows[r]) {
                 case 'name':
-                    label = 'Your name'; value = GL_.name;
+                    label = presence?.user ? 'Discord name' : 'Your name'; value = GL_.name;
                     if (this.name_editing) { value = this.chat_text; if (idiv(this.blink, 30) % 2 === 0) value += '|'; }
                     break;
                 case 'bubbles': label = 'Speech bubbles'; value = onoff(GL_.show_bubbles); break;
@@ -3740,7 +3750,7 @@ function faceIcon(x, y, look, size) {
     dsprPart(CD.hair_spr[look.hair], look.hair_col, l, t, w, h, x, y, s, s);
 }
 function hpColour(f) { return f > 0.5 ? GREEN : (f > 0.25 ? rgb(255, 204, 64) : rgb(235, 64, 80)); }
-function nameplate(wx, wy, name, look, hp, hpMax, col, ko) {
+function nameplate(wx, wy, name, look, hp, hpMax, col, ko, showHealth = true) {
     const s = GUI_W / VIEW_W;
     const gx = (wx - cam.x) * s, gy = (wy - cam.y) * s + 6;
     if (gx < -80 || gx > GUI_W + 80 || gy < -40 || gy > GUI_H + 10) return;
@@ -3755,9 +3765,11 @@ function nameplate(wx, wy, name, look, hp, hpMax, col, ko) {
     const nx = ix + icon + 6;
     txt(nx, y1 + 1, name, ts);
     const by = y1 + 17;
-    setC(rgb(40, 46, 58)); rect(nx, by, nx + bw, by + 5);
-    if (ko) { setC(GREY); txt(nx + bw, by - 4, 'KO', 0.55); }
-    else { const f = clamp(hp / hpMax, 0, 1); setC(hpColour(f)); rect(nx, by, nx + bw * f, by + 5); }
+    if (showHealth) {
+        setC(rgb(40, 46, 58)); rect(nx, by, nx + bw, by + 5);
+        if (ko) { setC(GREY); txt(nx + bw, by - 4, 'KO', 0.55); }
+        else { const f = clamp(hp / hpMax, 0, 1); setC(hpColour(f)); rect(nx, by, nx + bw * f, by + 5); }
+    } else { setC(col); txt(nx, by - 2, 'KD member', 0.5); }
     setC(WHITE);
 }
 
@@ -4302,6 +4314,10 @@ function drawWorld() {
     for (const v of R.vfx) if (v.kind === 'powerup_back') vfxDraw(v);
     for (const n of R.npcs) npcDraw(n);
     for (const f of R.fx) fxDrawBack(f);
+    if (presence) for (const peer of presence.players()) {
+        const state = peer.state;
+        kdDraw(peer.x, peer.y, state.facing, state.state, peer.frame, state.look, 1, WHITE, 1);
+    }
     if (R.player) playerDraw(R.player);
     for (const b of R.bullets) bulletDraw(b);
     for (const f of R.kfx) kfxDraw(f);
@@ -4462,11 +4478,52 @@ function frame(t) {
     last = t;
     let steps = 0;
     while (acc >= 1000 / 60 && steps < 5) { step(); acc -= 1000 / 60; steps++; }
+    if (presence) presence.update(t);
     if (steps > 0) render();
     requestAnimationFrame(frame);
 }
 
 window.KD_GAME = { vkey, IS_TOUCH, layout, M, start: null, debug: { G, GL_, get R() { return R; }, cam, roomGoto: n => roomGoto(n), get VIEW() { return [VIEW_W, VIEW_H]; } } };
+
+// Keep a chosen character through the Discord redirect without storing auth data.
+try {
+    const saved = JSON.parse(sessionStorage.getItem('kd-discord-character'));
+    if (saved?.look && SLOTS.every(slot => Number.isInteger(saved.look[slot.key]) && saved.look[slot.key] >= 0 && saved.look[slot.key] < slot.names.length)) {
+        GL_.look = lookCopy(saved.look);
+    }
+    if (typeof saved?.guestName === 'string') GL_.name = saved.guestName.slice(0, 16);
+    sessionStorage.removeItem('kd-discord-character');
+} catch {}
+
+if (presence) {
+    let guestName = GL_.name;
+    let discordIdentity = false;
+    presence.init({
+        onFocus() { K.down.clear(); K.pressed.clear(); M.down = false; },
+        beforeLogin() {
+            try { sessionStorage.setItem('kd-discord-character', JSON.stringify({ look: GL_.look, guestName: discordIdentity ? guestName : GL_.name })); } catch {}
+        },
+        onIdentity(identity) {
+            if (identity) {
+                if (!discordIdentity) guestName = GL_.name;
+                GL_.name = identity.name;
+                discordIdentity = true;
+                if (textKind === 'name') textClose();
+                G.name_editing = false;
+            } else if (discordIdentity) {
+                GL_.name = guestName;
+                discordIdentity = false;
+            }
+        },
+        getState() {
+            const p = R?.player;
+            return {
+                room: R?.name, typing: !!textKind,
+                state: p ? { x: p.x, y: p.y, facing: p.facing, state: p.state, frame: p.anim_frame, look: lookCopy(p.look) } : null
+            };
+        }
+    });
+}
 
 loadSprites().then(() => {
     audioInit();

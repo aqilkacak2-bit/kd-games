@@ -1,0 +1,28 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "kd-games-presence",
+  "main": "worker.js",
+  "compatibility_date": "2026-11-09",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "game.krackeddevs.com/auth/*", "zone_name": "krackeddevs.com" },
+    { "pattern": "game.krackeddevs.com/api/*", "zone_name": "krackeddevs.com" }
+  ],
+  "vars": {
+    "APP_ORIGIN": "https://game.krackeddevs.com",
+    "DISCORD_CLIENT_ID": "1514460582357762158",
+    "DISCORD_GUILD_ID": "1445246968367677573"
+  },
+  "durable_objects": {
+    "bindings": [
+      { "name": "AUTH_SESSIONS", "class_name": "AuthSession" },
+      { "name": "ROOMS", "class_name": "GameRoom" }
+    ]
+  },
+  "migrations": [
+    { "tag": "v1", "new_sqlite_classes": ["AuthSession", "GameRoom"] }
+  ],
+  "observability": { "enabled": true, "head_sampling_rate": 0.1 }
+}
