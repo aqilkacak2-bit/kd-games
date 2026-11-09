@@ -261,6 +261,15 @@ export default {
   async fetch(request, env) {
     try {
       const url = new URL(request.url);
+      if (url.origin === env.LEGACY_ORIGIN) {
+        const destination = new URL(env.APP_ORIGIN);
+        destination.pathname = url.pathname;
+        destination.search = url.search;
+        return new Response(null, {
+          status: 308,
+          headers: { Location: destination.href, "Cache-Control": "no-store" },
+        });
+      }
       if (url.origin !== env.APP_ORIGIN) return json({ error: "host_denied" }, 421);
       if (url.search.length > 4096) return json({ error: "request_too_long" }, 414);
       const configured = Boolean(env.DISCORD_CLIENT_ID && env.DISCORD_CLIENT_SECRET && env.DISCORD_GUILD_ID);

@@ -24,6 +24,7 @@ async function runtime(t) {
     log: new Log(LogLevel.ERROR),
     bindings: {
       APP_ORIGIN: ORIGIN,
+      LEGACY_ORIGIN: "https://platform.danialalias.com",
       DISCORD_CLIENT_ID: "1514460582357762158",
       DISCORD_CLIENT_SECRET: "test-only-secret",
       DISCORD_GUILD_ID: GUILD,
@@ -305,4 +306,31 @@ test("excessive login attempts are bounded", async t => {
     assert.equal((await mf.dispatchFetch(ORIGIN + "/auth/discord", { redirect: "manual" })).status, 302);
   }
   assert.equal((await mf.dispatchFetch(ORIGIN + "/auth/discord", { redirect: "manual" })).status, 429);
+});
+
+
+test("legacy domain redirects paths and queries only to the canonical game host", async t => {
+  const { mf, state } = await runtime(t);
+  const legacy = "https://platform.danialalias.com";
+  for (const path of [
+    "/",
+    "/auth/discord?next=https%3A%2F%2Fevil.example",
+    "//evil.example/path?x=1",
+    "/%2f%2fevil.example/path?code=abc&state=def",
+  ]) {
+    const response = await mf.dispatchFetch(legacy + path, { redirect: "manual" });
+    assert.equal(response.status, 308);
+    assert.equal(response.headers.get("Cache-Control"), "no-store");
+    const from = new URL(legacy + path);
+    const to = new URL(response.headers.get("Location"));
+    assert.equal(to.origin, ORIGIN);
+    assert.equal(to.pathname, from.pathname);
+    assert.equal(to.search, from.search);
+  }
+  const post = await mf.dispatchFetch(legacy + "/auth/logout", {
+    method: "POST", redirect: "manual", headers: { Origin: legacy },
+  });
+  assert.equal(post.status, 308);
+  assert.equal(post.headers.get("Location"), ORIGIN + "/auth/logout");
+  assert.equal(state.tokenCalls, 0);
 });

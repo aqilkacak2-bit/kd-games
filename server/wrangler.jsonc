@@ -8,10 +8,12 @@
   "preview_urls": false,
   "routes": [
     { "pattern": "game.krackeddevs.com/auth/*", "zone_name": "krackeddevs.com" },
-    { "pattern": "game.krackeddevs.com/api/*", "zone_name": "krackeddevs.com" }
+    { "pattern": "game.krackeddevs.com/api/*", "zone_name": "krackeddevs.com" },
+    { "pattern": "platform.danialalias.com/*", "zone_name": "danialalias.com" }
   ],
   "vars": {
     "APP_ORIGIN": "https://game.krackeddevs.com",
+    "LEGACY_ORIGIN": "https://platform.danialalias.com",
     "DISCORD_CLIENT_ID": "1514460582357762158",
     "DISCORD_GUILD_ID": "1445246968367677573"
   },
