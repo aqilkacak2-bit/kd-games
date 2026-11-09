@@ -4,7 +4,7 @@ Browser game at [game.krackeddevs.com](https://game.krackeddevs.com/).
 
 ## Discord sign-in and presence
 
-KD Discord members can sign in and see other signed-in members in the same game room. Discord provides the displayed name and avatar. Character movement and appearance are shared, while the game simulation runs in each browser.
+KD Discord members can sign in and see other signed-in members in the same game room. Discord provides the displayed name and avatar. Character movement, appearance and shared nonlethal hits are synchronized. Shots on live members trigger a flash, brief flinch, impact sound and reaction bubble while preserving their health and position. NPC simulation runs in each browser.
 
 The backend reuses the KD Square OAuth application and checks membership in guild `1445246968367677573`. Its registered game callback is `https://game.krackeddevs.com/auth/callback`.
 

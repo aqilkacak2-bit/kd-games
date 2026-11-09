@@ -5,6 +5,9 @@
     const ROOMS = new Set(['rm_select', 'rm_showcase', 'rm_kl', 'rm_main', 'rm_range', 'rm_rooftop']);
     const LOOK_LIMITS = { hair: 5, hair_col: 9, face: 5, skin: 5, top: 5, top_col: 9, bottom: 2, bottom_col: 7 };
     const peers = new Map();
+    const HIT_WEAPONS = new Set(['smg', 'shotgun', 'sniper', 'burst', 'ricochet', 'keris', 'laser', 'lightning', 'flame', 'rocket', 'grenade', 'freeze', 'thrown_grenade']);
+    const hitQueue = new Map(), seenHitEvents = new Set();
+    let hitSequence = 0, lastHitFlush = 0;
     let hooks, panel, elements, user = null, socket = null, room = null;
     let configured = false, checking = true, loggingOut = false, navigating = false, paused = false;
     let connection = 'offline', notice = '', authVersion = 0;
@@ -35,12 +38,41 @@
         });
     }
 
+    function validHit(value) {
+        if (!value || typeof value.targetId !== 'string' || !value.targetId || value.targetId.length > 32) return null;
+        if (!HIT_WEAPONS.has(value.weapon) || !Number.isFinite(value.x) || !Number.isFinite(value.y) || !Number.isFinite(value.dir)) return null;
+        return { targetId: value.targetId, weapon: value.weapon, x: value.x, y: value.y, dir: ((value.dir % 360) + 360) % 360 };
+    }
+
+    function reportHit(weapon, targetId, x, y, dir) {
+        if (!user || !room || paused || socket?.readyState !== WebSocket.OPEN || targetId === user.id || !peers.get(targetId)?.state) return false;
+        const hit = validHit({ weapon, targetId, x, y, dir });
+        if (!hit || (!hitQueue.has(targetId) && hitQueue.size >= 16)) return false;
+        hitQueue.set(targetId, hit);
+        return true;
+    }
+
+    function receiveHits(message) {
+        if (typeof message.id !== 'string' || !message.id || message.id.length > 64 || seenHitEvents.has(message.id)) return;
+        if (typeof message.attackerId !== 'string' || !message.attackerId || !Array.isArray(message.hits) || message.hits.length < 1 || message.hits.length > 16) return;
+        const hits = message.hits.map(validHit);
+        if (hits.some(hit => !hit)) return;
+        seenHitEvents.add(message.id);
+        if (seenHitEvents.size > 128) seenHitEvents.delete(seenHitEvents.values().next().value);
+        if (hooks.onHits) hooks.onHits({ id: message.id, attackerId: message.attackerId, hits });
+    }
+
     function closeSocket() {
         clearTimeout(connectTimeout);
         clearInterval(heartbeat);
         const previous = socket;
         socket = null;
         peers.clear();
+        hitQueue.clear();
+        seenHitEvents.clear();
+        hitSequence = 0;
+        lastHitFlush = 0;
+        if (hooks?.onPresenceReset) hooks.onPresenceReset();
         if (previous) previous.close(1000, 'Leaving room');
     }
 
@@ -195,12 +227,16 @@
                 render();
                 return;
             }
+            if (message.type === 'hits') { receiveHits(message); return; }
             const previousCount = peers.size;
             if (message.type === 'welcome' && Array.isArray(message.players)) {
                 peers.clear();
                 for (const player of message.players.slice(0, 256)) acceptPlayer(player);
             } else if (message.type === 'presence' && (peers.has(message.player?.id) || peers.size < 256)) acceptPlayer(message.player);
-            else if (message.type === 'leave') peers.delete(message.id);
+            else if (message.type === 'leave') {
+                peers.delete(message.id);
+                hitQueue.delete(message.id);
+            }
             if (message.type === 'welcome' || peers.size !== previousCount) render();
         });
         ws.addEventListener('close', event => {
@@ -209,6 +245,9 @@
             clearInterval(heartbeat);
             socket = null;
             peers.clear();
+            hitQueue.clear();
+            seenHitEvents.clear();
+            if (hooks.onPresenceReset) hooks.onPresenceReset();
             connection = 'offline';
             if (event.code === 4009) paused = true;
             else if (event.code === 4401 || event.code === 4403) { void refreshSession(); return; }
@@ -236,6 +275,11 @@
                 if (now - lastSent >= 100) {
                     const state = validState(snapshot.state);
                     if (state) { socket.send(JSON.stringify({ type: 'state', state })); lastSent = now; }
+                }
+                if (hitQueue.size && now - lastHitFlush >= 100) {
+                    socket.send(JSON.stringify({ type: 'hits', seq: ++hitSequence, hits: Array.from(hitQueue.values()) }));
+                    hitQueue.clear();
+                    lastHitFlush = now;
                 }
             }
         }
@@ -327,7 +371,7 @@
     }
 
     window.KD_PRESENCE = {
-        init, update,
+        init, update, reportHit,
         enterGame() { if (panel) { document.body.append(panel); panel.classList.add('floating'); } },
         get user() { return user; },
         players() {

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFile } from "node:fs/promises";
 import { Miniflare, Log, LogLevel, convertV4MiniflareOptions } from "miniflare";
 
 const ORIGIN = "https://game.krackeddevs.com";
@@ -7,18 +8,36 @@ const GUILD = "1445246968367677573";
 const users = {
   alice: { id: "100000000000000001", username: "alice", global_name: "Alice", avatar: null },
   bob: { id: "100000000000000002", username: "bob", global_name: "Bob", avatar: null },
+  charlie: { id: "100000000000000004", username: "charlie", global_name: "Charlie", avatar: null },
+  dana: { id: "100000000000000005", username: "dana", global_name: "Dana", avatar: null },
   outsider: { id: "100000000000000003", username: "outsider", global_name: "Outsider", avatar: null },
 };
 const appearance = {
   hair: 0, hair_col: 0, face: 0, skin: 1, top: 0, top_col: 0, bottom: 0, bottom_col: 0,
 };
 
-async function runtime(t) {
+async function runtime(t, { legacyAttachments = false } = {}) {
+  const scriptOptions = { scriptPath: new URL("../worker.js", import.meta.url).pathname, modules: true };
+  if (legacyAttachments) {
+    const source = await readFile(new URL("../worker.js", import.meta.url), "utf8");
+    scriptOptions.script = source.replace(
+      "export class GameRoom extends DurableObject {", "class GameRoomBase extends DurableObject {") + `
+export class GameRoom extends GameRoomBase {
+  makeLegacyAttachments() {
+    for (const socket of this.ctx.getWebSockets()) {
+      const info = socket.deserializeAttachment();
+      for (const key of ["stateAt", "lastHitSeq", "hitCooldowns", "hitWindowAt", "hitPacketCount"]) delete info[key];
+      socket.serializeAttachment(info);
+    }
+  }
+}
+`;
+    delete scriptOptions.scriptPath;
+  }
   const state = { membershipStatus: 200, tokenCalls: 0, memberCalls: 0 };
   const mf = new Miniflare(convertV4MiniflareOptions({
     name: "kd-games-presence-test",
-    scriptPath: new URL("../worker.js", import.meta.url).pathname,
-    modules: true,
+    ...scriptOptions,
     compatibilityDate: "2026-11-09",
     compatibilityFlags: ["nodejs_compat"],
     log: new Log(LogLevel.ERROR),
@@ -333,4 +352,201 @@ test("legacy domain redirects paths and queries only to the canonical game host"
   assert.equal(post.status, 308);
   assert.equal(post.headers.get("Location"), ORIGIN + "/auth/logout");
   assert.equal(state.tokenCalls, 0);
+});
+
+async function until(client, type) {
+  for (;;) {
+    const message = await client.next();
+    if (message.type === type) return message;
+  }
+}
+
+async function sync(client) {
+  client.socket.send(JSON.stringify({ type: "ping" }));
+  await until(client, "pong");
+}
+
+async function pose(client, x = 100, y = 150) {
+  client.socket.send(JSON.stringify({
+    type: "state",
+    state: { x, y, facing: 1, state: "idle", frame: 0, look: appearance, hp: 0 },
+  }));
+  await sync(client);
+}
+
+async function combat(t, options) {
+  const result = await runtime(t, options);
+  const sessions = await Promise.all(["alice", "bob", "charlie", "dana"]
+    .map(name => signIn(result.mf, name)));
+  const clients = [];
+  for (let i = 0; i < sessions.length; i++) {
+    clients.push(await socketClient(result.mf, sessions[i].cookie, i === 3 ? "rm_range" : "rm_main"));
+  }
+  const [a, b, c, other] = clients;
+  await pose(a, 100);
+  await pose(b, 160);
+  await pose(c, 200);
+  await pose(other, 160);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  for (const client of clients) client.messages.length = 0;
+  t.after(() => {
+    for (const client of clients) {
+      try { client.socket.close(); } catch {}
+    }
+  });
+  return { ...result, a, b, c, other };
+}
+
+function hit(targetId = users.bob.id, weapon = "smg", x = 160, y = 137) {
+  return { targetId, weapon, x, y, dir: 90 };
+}
+
+function sendHits(client, seq, hits = [hit()]) {
+  client.socket.send(JSON.stringify({ type: "hits", seq, hits, attackerId: "forged", hp: -100 }));
+}
+
+test("canonical nonlethal hits reach shooter, victim and room observers only", async t => {
+  const { a, b, c, other } = await combat(t);
+  sendHits(a, 1, [
+    hit(), hit(), hit(users.alice.id, "smg", 100), hit(users.dana.id),
+    hit("100000000000000099"),
+  ]);
+  const event = await until(a, "hits");
+  assert.equal(event.attackerId, users.alice.id);
+  assert.match(event.id, /^[a-f0-9-]{36}$/);
+  assert.deepEqual(event.hits, [{ targetId: users.bob.id, weapon: "smg", x: 160, y: 137, dir: 90 }]);
+  assert.deepEqual(await until(b, "hits"), event);
+  assert.deepEqual(await until(c, "hits"), event);
+  assert.deepEqual(other.messages, []);
+  assert.equal(JSON.stringify(event).includes("hp"), false);
+  sendHits(a, 2);
+  await sync(a);
+  assert.deepEqual(b.messages, [], "fresh sequences still obey target reaction cooldowns");
+  assert.deepEqual(c.messages, []);
+  await new Promise(resolve => setTimeout(resolve, 170));
+  sendHits(a, 1);
+  await sync(a);
+  await new Promise(resolve => setTimeout(resolve, 20));
+  assert.deepEqual(b.messages, [], "a replay must not repeat reactions");
+  assert.deepEqual(c.messages, []);
+  const leaveA = until(a, "leave");
+  const leaveC = until(c, "leave");
+  b.socket.close();
+  await Promise.all([leaveA, leaveC]);
+  sendHits(a, 3);
+  await sync(a);
+  assert.deepEqual(c.messages, [], "a disconnected target is ignored");
+});
+
+test("stale poses and impossible impacts are ignored without disconnecting", async t => {
+  const { a, b, c } = await combat(t);
+  sendHits(a, 1, [hit(users.bob.id, "smg", 500, 50)]);
+  await sync(a);
+  assert.deepEqual(b.messages, []);
+  await pose(b, 600);
+  c.messages.length = 0;
+  a.messages.length = 0;
+  sendHits(a, 2, [hit(users.bob.id, "keris", 600)]);
+  await sync(a);
+  assert.equal(b.messages.some(message => message.type === "hits"), false);
+  await new Promise(resolve => setTimeout(resolve, 3100));
+  await pose(a, 100);
+  b.messages.length = 0;
+  sendHits(a, 3, [hit(users.bob.id, "sniper", 600)]);
+  await sync(a);
+  assert.equal(b.messages.some(message => message.type === "hits"), false, "stale targets cannot be tagged");
+  await pose(b, 600);
+  sendHits(a, 4, [hit(users.bob.id, "sniper", 600)]);
+  assert.equal((await until(a, "hits")).hits[0].targetId, users.bob.id);
+});
+
+test("all weapon classes emit cosmetic-only hit events", async t => {
+  const { a, b } = await combat(t);
+  const weapons = ["smg", "shotgun", "sniper", "burst", "ricochet", "keris", "laser",
+    "lightning", "flame", "rocket", "grenade", "freeze", "thrown_grenade"];
+  for (let i = 0; i < weapons.length; i++) {
+    if (i) await new Promise(resolve => setTimeout(resolve, 160));
+    await pose(a, 100);
+    await pose(b, 160);
+    sendHits(a, i + 1, [hit(users.bob.id, weapons[i])]);
+    const event = await until(a, "hits");
+    assert.deepEqual(Object.keys(event).sort(), ["attackerId", "hits", "id", "type"]);
+    assert.equal(event.hits[0].weapon, weapons[i]);
+    assert.deepEqual(Object.keys(event.hits[0]).sort(), ["dir", "targetId", "weapon", "x", "y"]);
+  }
+});
+
+test("malformed or oversized hit packets close the sender", async t => {
+  const cases = [
+    [{ type: "hits", seq: 0, hits: [hit()] }, 1008],
+    [{ type: "hits", seq: 1, hits: [hit(users.bob.id, "unknown")] }, 1008],
+    [{ type: "hits", seq: 1, hits: [hit(users.bob.id, "smg", null)] }, 1008],
+    [{ type: "hits", seq: 1, hits: [{ ...hit(), dir: 361 }] }, 1008],
+    [{ type: "hits", seq: 1, hits: Array(17).fill(hit()) }, 1008],
+    [{ type: "hits", seq: 1, hits: [{ ...hit(), targetId: "not-an-id" }] }, 1008],
+    [{ type: "hits", seq: 1, hits: [hit()], padding: "x".repeat(5000) }, 1009],
+  ];
+  for (const [packet, code] of cases) {
+    await t.test("reject " + JSON.stringify(packet).slice(0, 80), async subtest => {
+      const { a } = await combat(subtest);
+      const closing = closed(a.socket, "malformed hit");
+      a.socket.send(JSON.stringify(packet));
+      assert.equal((await closing).code, code);
+    });
+  }
+});
+
+test("state plus hit updates at 10Hz remain connected and hit floods are bounded", async t => {
+  const { a, b } = await combat(t);
+  let closeCode = null;
+  a.socket.addEventListener("close", event => { closeCode = event.code; });
+  for (let i = 1; i <= 12; i++) {
+    a.socket.send(JSON.stringify({
+      type: "state",
+      state: { x: 100, y: 150, facing: 1, state: "idle", frame: 0, look: appearance },
+    }));
+    sendHits(a, i);
+    await new Promise(resolve => setTimeout(resolve, 100));
+  }
+  await sync(a);
+  assert.equal(closeCode, null);
+  assert.ok(b.messages.some(message => message.type === "hits"));
+  await new Promise(resolve => setTimeout(resolve, 1100));
+  const closing = closed(a.socket, "hit flood");
+  for (let i = 13; i <= 25; i++) sendHits(a, i);
+  assert.equal((await closing).code, 1008);
+});
+
+test("legacy open-socket attachments accept state and ping before enabling hits", async t => {
+  const { mf, a, b } = await combat(t, { legacyAttachments: true });
+  const namespace = await mf.getDurableObjectNamespace("ROOMS");
+  const room = namespace.get(namespace.idFromName(GUILD + ":rm_main"));
+  await room.makeLegacyAttachments();
+  await sync(a);
+  sendHits(a, 1);
+  await sync(a);
+  assert.equal(b.messages.some(message => message.type === "hits"), false);
+  await pose(a, 100);
+  await pose(b, 160);
+  sendHits(a, 2);
+  assert.equal((await until(a, "hits")).hits[0].targetId, users.bob.id);
+});
+
+
+test("a full precision 16-hit batch fits the bounded packet envelope", async t => {
+  const { a } = await combat(t);
+  const packet = {
+    type: "hits", seq: 1,
+    hits: Array.from({ length: 16 }, () => ({
+      targetId: users.bob.id, weapon: "thrown_grenade",
+      x: 160.12345678901234, y: 137.12345678901234, dir: 123.45678901234567,
+    })),
+  };
+  const encoded = JSON.stringify(packet);
+  assert.ok(Buffer.byteLength(encoded) > 2048);
+  assert.ok(Buffer.byteLength(encoded) < 4096);
+  a.socket.send(encoded);
+  const event = await until(a, "hits");
+  assert.equal(event.hits.length, 1);
+  assert.equal(event.hits[0].targetId, users.bob.id);
 });

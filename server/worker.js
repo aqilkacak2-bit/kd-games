@@ -6,6 +6,16 @@ const OAUTH_TTL = 10 * 60 * 1000;
 const SESSION_TTL = 24 * 60 * 60 * 1000;
 const MEMBER_CHECK_TTL = 5 * 60 * 1000;
 const CONNECTION_TTL = 10 * 60 * 1000;
+const HIT_POSE_TTL = 3000;
+const HIT_REACTION_COOLDOWN = 150;
+// Travel range plus movement and network allowance. Collision simulation
+// stays in the game, while the server bounds cosmetic hit claims.
+const HIT_WEAPONS = {
+  smg: 700, shotgun: 320, sniper: 1800, burst: 900,
+  ricochet: 1200, keris: 100, laser: 340, lightning: 600,
+  flame: 220, rocket: 1800, grenade: 1000, freeze: 480,
+  thrown_grenade: 3600,
+};
 const DISCORD_API = "https://discord.com/api/v10";
 const ROOMS = {
   rm_select: [320, 180],
@@ -403,6 +413,18 @@ function validState(value, room) {
   };
 }
 
+function validHitBatch(payload, room) {
+  if (!Number.isSafeInteger(payload.seq) || payload.seq <= 0 ||
+      !Array.isArray(payload.hits) || payload.hits.length < 1 || payload.hits.length > 16) return false;
+  const [width, height] = ROOMS[room];
+  return payload.hits.every(hit =>
+    hit && typeof hit === "object" && typeof hit.targetId === "string" &&
+    /^\d{17,20}$/.test(hit.targetId) && typeof hit.weapon === "string" && Object.hasOwn(HIT_WEAPONS, hit.weapon) &&
+    Number.isFinite(hit.x) && hit.x >= -64 && hit.x <= width + 64 &&
+    Number.isFinite(hit.y) && hit.y >= -256 && hit.y <= height + 256 &&
+    Number.isFinite(hit.dir) && hit.dir >= 0 && hit.dir <= 360);
+}
+
 function attachment(socket) {
   return socket.deserializeAttachment();
 }
@@ -503,7 +525,7 @@ export class GameRoom extends DurableObject {
       socket.close(4401, "Session expired");
       return;
     }
-    if (typeof message !== "string" || new TextEncoder().encode(message).byteLength > 2048) {
+    if (typeof message !== "string" || new TextEncoder().encode(message).byteLength > 4096) {
       socket.close(1009, "Message too large");
       return;
     }
@@ -514,7 +536,7 @@ export class GameRoom extends DurableObject {
     }
     info.messageCount++;
     socket.serializeAttachment(info);
-    if (info.messageCount > 20) {
+    if (info.messageCount > 40) {
       socket.close(1008, "Message rate exceeded");
       return;
     }
@@ -529,14 +551,73 @@ export class GameRoom extends DurableObject {
       socket.send(JSON.stringify({ type: "pong" }));
       return;
     }
+    if (payload?.type === "hits") {
+      this.handleHits(socket, info, payload, now);
+      return;
+    }
     const state = payload?.type === "state" ? validState(payload.state, info.room) : null;
     if (!state) {
       socket.close(1008, "Invalid player state");
       return;
     }
     info.state = state;
+    info.stateAt = now;
     socket.serializeAttachment(info);
     this.broadcast({ type: "presence", player: player(info) }, socket);
+  }
+
+  handleHits(socket, info, payload, now) {
+    if (!validHitBatch(payload, info.room)) {
+      socket.close(1008, "Invalid hit batch");
+      return;
+    }
+    if (now - (info.hitWindowAt || 0) >= 1000) {
+      info.hitWindowAt = now;
+      info.hitPacketCount = 0;
+    }
+    info.hitPacketCount = (info.hitPacketCount || 0) + 1;
+    if (info.hitPacketCount > 12) {
+      socket.close(1008, "Hit rate exceeded");
+      return;
+    }
+    if (payload.seq <= (info.lastHitSeq || 0)) {
+      socket.serializeAttachment(info);
+      return;
+    }
+    info.lastHitSeq = payload.seq;
+    info.hitCooldowns = Object.fromEntries(Object.entries(info.hitCooldowns || {})
+      .filter(([, time]) => now - time >= 0 && now - time < HIT_REACTION_COOLDOWN)
+      .slice(-100));
+    const fresh = entry => entry.state && Number.isFinite(entry.stateAt) &&
+      now - entry.stateAt >= 0 && now - entry.stateAt <= HIT_POSE_TTL;
+    if (!fresh(info)) {
+      socket.serializeAttachment(info);
+      return;
+    }
+    const targets = new Map(this.ctx.getWebSockets().map(attachment)
+      .filter(entry => active(entry) && fresh(entry)).map(entry => [entry.user.id, entry]));
+    const seen = new Set();
+    const accepted = [];
+    for (const hit of payload.hits) {
+      if (hit.targetId === info.user.id || seen.has(hit.targetId)) continue;
+      seen.add(hit.targetId);
+      const target = targets.get(hit.targetId);
+      if (!target || info.hitCooldowns[hit.targetId] !== undefined) continue;
+      const pose = target.state;
+      if (Math.abs(hit.x - pose.x) > 39 || hit.y < pose.y - 58 || hit.y > pose.y + 32) continue;
+      if (Math.hypot(pose.x - info.state.x, pose.y - info.state.y) > HIT_WEAPONS[hit.weapon]) continue;
+      info.hitCooldowns[hit.targetId] = now;
+      accepted.push({
+        targetId: hit.targetId, weapon: hit.weapon,
+        x: pose.x, y: pose.y - 13,
+        dir: Math.round((hit.dir % 360) * 100) / 100,
+      });
+    }
+    info.hitCooldowns = Object.fromEntries(Object.entries(info.hitCooldowns).slice(-100));
+    socket.serializeAttachment(info);
+    if (accepted.length) {
+      this.broadcast({ type: "hits", id: crypto.randomUUID(), attackerId: info.user.id, hits: accepted });
+    }
   }
 
   webSocketClose(socket, code) {

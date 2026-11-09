@@ -763,6 +763,49 @@ const GL_ = {
 
 const presence = window.KD_PRESENCE;
 
+// Shared hits animate an offset and flash; player simulation is never changed.
+const liveHitEffects = new Map();
+function liveHitPose(id, x, y) {
+    const effect = liveHitEffects.get(id);
+    if (!effect) return [x, y];
+    const fade = Math.max(0, 1 - effect.age / 18);
+    return [x + effect.kick * fade, y - Math.sin(Math.min(effect.age, 18) / 18 * Math.PI) * 3 * fade];
+}
+function stepLiveHitEffects() {
+    for (const [id, effect] of liveHitEffects) {
+        effect.age += 1;
+        if (effect.age >= 75) liveHitEffects.delete(id);
+    }
+}
+function applyLiveHits(message) {
+    if (!R || R.title) return;
+    const peers = presence ? presence.players() : [];
+    let reacted = false;
+    for (const hit of message.hits) {
+        const target = hit.targetId === presence?.user?.id ? R.player : peers.find(peer => peer.id === hit.targetId);
+        if (!target) continue;
+        const weapon = hit.weapon === 'thrown_grenade' ? WEAPONS.grenade : WEAPONS[hit.weapon];
+        if (!weapon) continue;
+        let text = 'Hey! Watch it!';
+        if (hit.weapon === 'flame') text = 'Hot! Hot!';
+        if (hit.weapon === 'freeze') text = 'Brrr!';
+        if (hit.weapon === 'lightning') text = 'BZZZT!';
+        if (hit.weapon === 'keris') text = 'Easy there!';
+        if (['rocket', 'grenade', 'thrown_grenade'].includes(hit.weapon)) text = 'Whoa!';
+        const strength = Math.min(7, weapon.knock || weapon.blast_knock || 1);
+        liveHitEffects.set(hit.targetId, { age: 0, kick: ldx(strength, hit.dir), text });
+        vfxImpact(target.x, target.y - 13, hit.dir, false, null, 0, target.y, 0.65);
+        reacted = true;
+    }
+    if (reacted) kdSfx('snd_hit', 0.1, 0.55);
+}
+function liveHitFlash(id) {
+    return (liveHitEffects.get(id)?.age ?? 75) < 8;
+}
+function reportLiveHit(peer, weapon, x, y, dir) {
+    if (presence) presence.reportHit(weapon, peer.id, x, y, dir);
+}
+
 const levelFromExp = e => Math.floor(Math.sqrt(e / 100)) + 1;
 const expForLevel = l => (l - 1) * (l - 1) * 100;
 function kdAddExp(amount, reason) {
@@ -1711,15 +1754,25 @@ const G = {
 
         // name plates under everyone's feet: face, name, health
         for (const n of R.npcs) nameplate(n.x, n.y, n.npc_name, n.look, n.hp, n.hp_max, rgb(150, 200, 255), n.ko > 0);
-        if (R.player) nameplate(R.player.x, R.player.y, GL_.name, R.player.look, R.player.hp, R.player.hp_max, GREEN, false);
+        if (R.player) {
+            const [x, y] = liveHitPose(presence?.user?.id, R.player.x, R.player.y);
+            nameplate(x, y, GL_.name, R.player.look, R.player.hp, R.player.hp_max, GREEN, false);
+        }
         if (presence) for (const peer of presence.players()) {
-            nameplate(peer.x, peer.y, peer.name, peer.state.look, 0, 0, rgb(150, 200, 255), false, false);
+            const [x, y] = liveHitPose(peer.id, peer.x, peer.y);
+            nameplate(x, y, peer.name, peer.state.look, 0, 0, rgb(150, 200, 255), false, false);
         }
 
         if (GL_.show_bubbles) {
             for (const n of R.npcs) if (n.bubble_timer > 0) drawBubble(n.x, n.y - 36, n.bubble_text, Math.min(1, n.bubble_timer / 20));
             const p = R.player;
             if (p && p.bubble_timer > 0) drawBubble(p.x, p.y - 36, p.bubble_text, Math.min(1, p.bubble_timer / 20));
+            for (const [id, effect] of liveHitEffects) {
+                const target = id === presence?.user?.id ? p : presence?.players().find(peer => peer.id === id);
+                if (!target || (target === p && p.bubble_timer > 0)) continue;
+                const [x, y] = liveHitPose(id, target.x, target.y);
+                drawBubble(x, y - 36, effect.text, Math.min(1, (75 - effect.age) / 20));
+            }
         }
 
         // HUD level + EXP
@@ -2172,15 +2225,35 @@ function npcAt(x, y, r = 2) {
     for (const n of R.npcs) { const b = npcBox(n); if (x + r > b[0] && x - r < b[2] && y + 1 > b[1] && y - 1 < b[3]) return n; }
     return null;
 }
-function segRect(x1, y1, x2, y2, b) {          // Liang-Barsky
+function segRectEntry(x1, y1, x2, y2, b) {     // Liang-Barsky, first contact fraction
     let t0 = 0, t1 = 1;
     const dx = x2 - x1, dy = y2 - y1;
     const p = [-dx, dx, -dy, dy], q = [x1 - b[0], b[2] - x1, y1 - b[1], b[3] - y1];
     for (let i = 0; i < 4; i++) {
-        if (p[i] === 0) { if (q[i] < 0) return false; }
-        else { const t = q[i] / p[i]; if (p[i] < 0) { if (t > t1) return false; if (t > t0) t0 = t; } else { if (t < t0) return false; if (t < t1) t1 = t; } }
+        if (p[i] === 0) { if (q[i] < 0) return null; }
+        else { const t = q[i] / p[i]; if (p[i] < 0) { if (t > t1) return null; if (t > t0) t0 = t; } else { if (t < t0) return null; if (t < t1) t1 = t; } }
     }
-    return true;
+    return t0;
+}
+function segRect(x1, y1, x2, y2, b) { return segRectEntry(x1, y1, x2, y2, b) !== null; }
+function firstSolidOnSegment(x1, y1, x2, y2) {
+    let wallFraction = 1 + Number.EPSILON;
+    for (const solid of R.solids) {
+        const entry = segRectEntry(x1, y1, x2, y2, [solid.x1, solid.y1, solid.x2, solid.y2]);
+        if (entry !== null) wallFraction = Math.min(wallFraction, entry);
+    }
+    return wallFraction;
+}
+function liveTargetsOnSegment(x1, y1, x2, y2, ignored = []) {
+    if (!presence) return [];
+    const wallFraction = firstSolidOnSegment(x1, y1, x2, y2);
+    const hits = [];
+    for (const peer of presence.players()) {
+        if (ignored.includes(peer.id)) continue;
+        const entry = segRectEntry(x1, y1, x2, y2, npcBox(peer));
+        if (entry !== null && entry < wallFraction) hits.push({ peer, entry, x: lerp(x1, x2, entry), y: lerp(y1, y2, entry) });
+    }
+    return hits.sort((a, b) => a.entry - b.entry);
 }
 const npcsOnLine = (x1, y1, x2, y2) => R.npcs.filter(n => segRect(x1, y1, x2, y2, npcBox(n)));
 const boxAt = (x, y) => R.boxes.find(b => x >= b.x && x < b.x + 16 && y >= b.y && y < b.y + 16) || null;
@@ -2232,13 +2305,13 @@ function gunShoot(g) {
         R.bullets.push(makeBullet(mx, my, dir, spd, {
             kind: w.kind, life: w.bullet_life, life_max: w.bullet_life, pierce: w.pierce, bounces: w.bounces, knock: w.knock, damage: w.damage,
             blast_damage: w.blast_damage, burn: w.burn, freeze: w.freeze, blast: w.blast, blast_knock: w.blast_knock, grav: w.grav,
-            col: w.colour, xscale: w.bullet_scale }));
+            col: w.colour, xscale: w.bullet_scale, weapon_key: g.weapon_key }));
     }
 }
 function makeBullet(x, y, dir, spd, o) {
     return Object.assign({ x, y, xprev: x, yprev: y, hsp: ldx(spd, dir), vsp: ldy(spd, dir), angle: dir, kind: 'bullet', life: 90, life_max: 90,
         pierce: 0, bounces: 0, knock: 1, damage: 6, blast_damage: 0, burn: 0, freeze: 0, blast: 0, blast_knock: 0, grav: 0, thrown: false,
-        landed: false, hit_list: [], col: WHITE, xscale: 1, alpha: 1, dead: false }, o);
+        landed: false, hit_list: [], col: WHITE, xscale: 1, alpha: 1, dead: false, weapon_key: 'smg' }, o);
 }
 const bSpeed = b => Math.hypot(b.hsp, b.vsp);
 const bDir = b => pdir(0, 0, b.hsp, b.vsp);
@@ -2260,6 +2333,7 @@ function beamUpdate(g) {
         const bx = boxAt(ex, ey);
         if (bx) kdBoxDamage(bx, w.damage * 2);
         for (const n of npcsOnLine(m0, m1, ex, ey)) npcHit(n, g.aim_dir, w.knock, choose('Ow, that burns!', 'Who turned on the laser?!', 'Pew pew... OUCH'), w.damage);
+        for (const hit of liveTargetsOnSegment(m0, m1, ex, ey)) reportLiveHit(hit.peer, g.weapon_key, hit.x, hit.y, g.aim_dir);
         kdSfxP('snd_shoot', w.pitch, 0.05, 0.22);
         vfxImpact(ex, ey, g.aim_dir, false, PAL.wall, g.aim_dir + 180, 100000, 0.4);
     }
@@ -2270,11 +2344,12 @@ function lightningFire(g) {
     if (g.owner) kdRecoilKick(g.owner, g.aim_dir, 1.6);
     const [m0, m1] = gunMuzzle(g);
     const pts = [m0, m1], hit = [];
+    const candidates = R.npcs.concat(presence ? presence.players() : []);
     let cx = m0, cy = m1, range = w.beam_range, cone = true;
     const aim = g.aim_dir;
     for (let c = 0; c < w.chain; c++) {
         let best = null, bd = range;
-        for (const n of R.npcs) {
+        for (const n of candidates) {
             const tx = n.x, ty = n.y - 13, d = pdist(cx, cy, tx, ty);
             if (d > bd) continue;
             if (cone && Math.abs(angleDiff(pdir(cx, cy, tx, ty), aim)) > 35) continue;
@@ -2287,8 +2362,11 @@ function lightningFire(g) {
         const dir = pdir(cx, cy, best.x, best.y - 13);
         cx = best.x; cy = best.y - 13;
         pts.push(cx, cy);
-        best.shock = Math.max(best.shock, w.shock);
-        npcHit(best, dir, w.knock, choose('BZZZT!', 'My hair!', 'Who pushed to prod?!'), w.damage);
+        if (typeof best.id === 'string') reportLiveHit(best, g.weapon_key, cx, cy, dir);
+        else {
+            best.shock = Math.max(best.shock, w.shock);
+            npcHit(best, dir, w.knock, choose('BZZZT!', 'My hair!', 'Who pushed to prod?!'), w.damage);
+        }
         range = 90; cone = false;
     }
     if (hit.length === 0) {
@@ -2312,6 +2390,13 @@ function swordHit(g) {
         g.swing_hit.push(n);
         npcHit(n, g.aim_dir, w.knock, choose("Hey, that's sharp!", 'Whoa, a keris!', 'Easy there, pendekar!', 'Not the face!'), w.damage);
         vfxImpact(cx, cy, g.aim_dir, false, null, 0, n.y, 0.8);
+    }
+    if (presence) for (const peer of presence.players()) {
+        const cx = peer.x, cy = peer.y - 13;
+        if (pdist(px, py, cx, cy) > w.reach + 6 || g.swing_hit.includes(peer.id)) continue;
+        if (Math.abs(angleDiff(pdir(px, py, cx, cy), g.aim_dir)) > w.arc + 20 || lineHitsSolid(px, py, cx, cy)) continue;
+        g.swing_hit.push(peer.id);
+        reportLiveHit(peer, g.weapon_key, cx, cy, g.aim_dir);
     }
     for (const b of R.boxes.slice()) {
         if (pdist(px, py, b.x + 8, b.y + 8) > w.reach + 10) continue;
@@ -2355,7 +2440,13 @@ function playerDamage(dmg, sx, sy) {
         GL_.flash = 0.5;
     }
 }
-function kdExplode(x, y, r, knock, dmg = 40) {
+function reportLiveExplosion(x, y, r, weapon) {
+    if (!presence) return;
+    for (const peer of presence.players()) {
+        if (pdist(x, y, peer.x, peer.y - 13) <= r) reportLiveHit(peer, weapon, peer.x, peer.y - 13, pdir(x, y, peer.x, peer.y - 13));
+    }
+}
+function kdExplode(x, y, r, knock, dmg = 40, weapon = 'grenade', shareHits = true) {
     for (const n of R.npcs) {
         const d = pdist(x, y, n.x, n.y - 13);
         if (d > r) continue;
@@ -2371,6 +2462,7 @@ function kdExplode(x, y, r, knock, dmg = 40) {
         if (f > 0.45 && n.freeze <= 0) n.burn = Math.max(n.burn, 120);
         if (n.bubble_timer <= 0) { n.bubble_text = choose('WHOA!', 'Merge conflict!!', 'My ears!', 'Not in the lab!'); n.bubble_timer = 90; }
     }
+    if (shareHits) reportLiveExplosion(x, y, r, weapon);
     for (const b of R.boxes.slice()) if (pdist(x, y, b.x + 8, b.y + 8) < r + 8) kdBoxDamage(b, dmg);
     const p = R.player;
     if (p) { const pd = pdist(x, y, p.x, p.y - 13); if (pd <= r) playerDamage(Math.round(dmg * 0.5 * (0.4 + 0.6 * (1 - pd / r))), x, y); }
@@ -2595,9 +2687,32 @@ function bulletStep(b) {
                 else hit = true;
         }
     }
+    if (!wall && !hit && !b.live_path_blocked) {
+        const wallFraction = firstSolidOnSegment(b.x, b.y, b.x + b.hsp, b.y + b.vsp);
+        const contacts = liveTargetsOnSegment(b.x, b.y, b.x + b.hsp, b.y + b.vsp, b.hit_list);
+        for (const contact of contacts) {
+            b.hit_list.push(contact.peer.id);
+            if (b.blast > 0) {
+                b.x = contact.x; b.y = contact.y; hit = true;
+                break;
+            }
+            reportLiveHit(contact.peer, b.weapon_key, contact.x, contact.y, bDir(b));
+            if (b.kind === 'flame') continue;
+            if (b.pierce > 0) b.pierce -= 1;
+            else { b.x = contact.x; b.y = contact.y; hit = true; break; }
+        }
+        if (wallFraction <= 1 && !hit && b.kind !== 'grenade') {
+            // Share a rocket's first wall impact even if legacy physics crosses
+            // a thin wall. Bouncing grenades keep their own collision path.
+            b.live_path_blocked = true;
+            if (b.blast > 0) reportLiveExplosion(
+                lerp(b.x, b.x + b.hsp, wallFraction),
+                lerp(b.y, b.y + b.vsp, wallFraction), b.blast, b.weapon_key);
+        }
+    }
     const out = b.x < -16 || b.y < -16 || b.x > R.w + 16 || b.y > R.h + 16;
     if (hit || wall || b.life <= 0 || out) {
-        if (b.blast > 0 && !out) kdExplode(b.x, b.y, b.blast, b.blast_knock, b.blast_damage);
+        if (b.blast > 0 && !out) kdExplode(b.x, b.y, b.blast, b.blast_knock, b.blast_damage, b.weapon_key, !b.live_path_blocked);
         else if (hit || wall) {
             const isz = clamp(0.35 + b.damage / 40, 0.35, 1.3);
             if (wall) {
@@ -3701,6 +3816,7 @@ function stationName(id) {
 
 // ---------------- rooms ----------------
 function roomGoto(name) {
+    liveHitEffects.clear();
     const def = window.KD_ROOMS[name];
     R = { name, w: def.w, h: def.h, bg: def.bg, solids: [], ladders: [], stairs: [], stations: [], npcs: [], guns: [], bullets: [], sparks: [], fx: [],
           decor: [], lineup: null, player: null, kfx: [], vfx: [], boxes: [], items: [], fog: [], show: [], kl: false, title: null };
@@ -4042,7 +4158,7 @@ function grenadeThrowStep(p) {
     if (!p.thrown && p.throw_t <= THROW_TIME * 0.5) {
         p.thrown = true;
         const h = throwHand(p), dir = pdir(h[0], h[1], mouseRoomX(), mouseRoomY()), dist = pdist(h[0], h[1], mouseRoomX(), mouseRoomY());
-        const b = makeBullet(h[0], h[1], dir, clamp(2.2 + dist / 45, 3, 5.8), { kind: 'grenade', thrown: true, life: 600, life_max: 600, grav: 0.2, blast: 34, blast_knock: 11, blast_damage: 50, knock: 0, damage: 0, angle: dir });
+        const b = makeBullet(h[0], h[1], dir, clamp(2.2 + dist / 45, 3, 5.8), { kind: 'grenade', thrown: true, life: 600, life_max: 600, grav: 0.2, blast: 34, blast_knock: 11, blast_damage: 50, knock: 0, damage: 0, angle: dir, weapon_key: 'thrown_grenade' });
         b.vsp -= 1.3;
         R.bullets.push(b);
         kdSfxP('snd_jump', 0.75, 0.05, 0.7);
@@ -4262,6 +4378,7 @@ function step() {
         if (pendingRoom) { const r = pendingRoom; pendingRoom = null; roomGoto(r); }
         return;
     }
+    stepLiveHitEffects();
     G.step();
     if (R.player) playerStep(R.player);
     for (const n of R.npcs) npcStep(n);
@@ -4316,9 +4433,22 @@ function drawWorld() {
     for (const f of R.fx) fxDrawBack(f);
     if (presence) for (const peer of presence.players()) {
         const state = peer.state;
-        kdDraw(peer.x, peer.y, state.facing, state.state, peer.frame, state.look, 1, WHITE, 1);
+        const [x, y] = liveHitPose(peer.id, peer.x, peer.y);
+        kdDraw(x, y, state.facing, state.state, peer.frame, state.look, 1, WHITE, 1);
+        if (liveHitFlash(peer.id)) {
+            FOG = WHITE; kdDraw(x, y, state.facing, state.state, peer.frame, state.look, 1, WHITE, 0.8, false); FOG = null;
+        }
     }
-    if (R.player) playerDraw(R.player);
+    if (R.player) {
+        const p = R.player, id = presence?.user?.id;
+        const [x, y] = liveHitPose(id, p.x, p.y);
+        ctx.save(); ctx.translate(x - p.x, y - p.y);
+        playerDraw(p);
+        if (liveHitFlash(id)) {
+            FOG = WHITE; kdDraw(p.x, p.y - p.recoil_lift, p.facing, p.state, p.anim_frame, p.look, 1, WHITE, 0.8, false); FOG = null;
+        }
+        ctx.restore();
+    }
     for (const b of R.bullets) bulletDraw(b);
     for (const f of R.kfx) kfxDraw(f);
     for (const v of R.vfx) if (v.kind !== 'powerup_back') vfxDraw(v);
@@ -4499,6 +4629,8 @@ if (presence) {
     let guestName = GL_.name;
     let discordIdentity = false;
     presence.init({
+        onHits: applyLiveHits,
+        onPresenceReset() { liveHitEffects.clear(); },
         onFocus() { K.down.clear(); K.pressed.clear(); M.down = false; },
         beforeLogin() {
             try { sessionStorage.setItem('kd-discord-character', JSON.stringify({ look: GL_.look, guestName: discordIdentity ? guestName : GL_.name })); } catch {}
