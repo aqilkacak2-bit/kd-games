@@ -14,10 +14,14 @@ From `server`, run `npm ci` and `npm test`. The tests exercise OAuth state, memb
 
 ## Deploy
 
-The static Cloudflare Pages project is `kd-games-platform`. Upload **both** `index.html` and `discord-presence.js` together in a clean publish directory using `wrangler pages deploy <publish-directory> --project-name kd-games-platform --branch main`.
+The static Cloudflare Pages project is `kd-games-platform`. Upload `index.html`, `discord-presence.js`, and `assets/kd-logo.png` together in a clean publish directory using `wrangler pages deploy <publish-directory> --project-name kd-games-platform --branch main`.
 
 The Worker configuration is `server/wrangler.jsonc`. From `server`, deploy it with `npx wrangler deploy`. The `DISCORD_CLIENT_SECRET` secret must be configured with `npx wrangler secret put DISCORD_CLIENT_SECRET`. Keep its value outside the repository and browser code.
 
 The Worker handles `/auth/*` and `/api/*` on the game domain. The previous `platform.danialalias.com` address redirects to the new domain.
 
 GitHub pushes require a separate deployment to publish changes.
+
+## Branding
+
+`assets/kd-logo.png` is the official KrackedDevs transparent logo, sourced from the existing KD website asset `https://krackeddevs.com/landing-v3/kd-logo-t.png`. The canvas crops its transparent margin when drawing; the source artwork is unchanged.

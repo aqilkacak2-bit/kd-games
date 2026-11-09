@@ -60,8 +60,7 @@ body.touch.portrait.loaded #hint { display: block; }
 #start.gone { display: none; }
 .card { max-width: 560px; width: 100%; background: rgba(18,22,30,.95); border: 2px solid var(--green); border-radius: 16px;
         padding: 24px 24px 20px; box-sizing: border-box; box-shadow: 0 0 40px rgba(64,226,110,.15); max-height: 100%; overflow: auto; }
-.logo { font: 800 40px/1 ui-monospace, "SF Mono", Consolas, monospace; color: var(--green); letter-spacing: 1px;
-        text-shadow: 0 0 18px rgba(64,226,110,.45); }
+.logo { display: block; width: 80px; height: 60px; overflow: visible; }
 .card h1 { margin: 10px 0 2px; font-size: 22px; }
 .card .sub { color: var(--grey); font-size: 14px; margin-bottom: 16px; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; margin-bottom: 18px; }
@@ -99,7 +98,9 @@ body.touch .touch-only { display: contents; }
 <a id="dlink" href="#" target="_blank" rel="noopener" hidden>Open the KD Discord channel ↗</a>
 <div id="start">
   <div class="card">
-    <div class="logo">&lt;KD/&gt;</div>
+    <svg class="logo" viewBox="102 142 314 234" role="img" aria-label="KrackedDevs">
+      <image href="/assets/kd-logo.png" width="512" height="512" />
+    </svg>
     <h1>KDlab1</h1>
     <div class="sub">Pick your builder, visit the Showcase Hall, walk the streets of Kuala Lumpur and test 12 weapons in the KD Lab.</div>
     <div class="keys">
@@ -331,6 +332,23 @@ let stageRect = { x: 0, y: 0, w: 1280, h: 720 };
 // sprites
 // =====================================================================
 const SPR = {};
+const KD_LOGO = new Image();
+function loadBrandLogo() {
+    return new Promise(resolve => {
+        KD_LOGO.onload = resolve;
+        KD_LOGO.onerror = resolve;
+        KD_LOGO.src = '/assets/kd-logo.png';
+    });
+}
+function drawBrandLogo(x, y, width) {
+    if (!KD_LOGO.complete || !KD_LOGO.naturalWidth) return;
+    ctx.save();
+    ctx.globalAlpha = dalpha;
+    ctx.imageSmoothingEnabled = false;
+    // Crop only the transparent margin; keep the official artwork unchanged.
+    ctx.drawImage(KD_LOGO, 102, 142, 314, 234, x, y, width, width * 234 / 314);
+    ctx.restore();
+}
 function loadSprites() {
     return Promise.all(Object.entries(window.KD_SPRITES).map(([k, d]) => new Promise(res => {
         const im = new Image();
@@ -849,7 +867,7 @@ function kdStationInfo(id) {
     const i = { title: '', sub: '', tiles: [], lines: [], cols: [], xp: 20, reason: '', feed: false, discord: false };
     switch (id) {
         case 'about':
-            i.title = '<KD/>  KrackedDevs';
+            i.title = 'KrackedDevs';
             i.sub = "Malaysia's builder ecosystem   |   Learn. Build. Ship.";
             i.lines = ['A community, a school and a product lab, run by builders.', 'Free for builders to join. No experience gate.', '',
                 '## What we run', '- Community: guilds, weekly classes, hackathons, bounties and KD Square.', '  Members earn EXP for shipping.',
@@ -1775,21 +1793,7 @@ const G = {
             }
         }
 
-        // HUD level + EXP
-        const lvl = levelFromExp(GL_.exp), cur = expForLevel(lvl), next = expForLevel(lvl + 1);
-        const fr = (GL_.exp - cur) / (next - cur);
-        setA(0.85); setC(DARK); rrect(16, 16, 336, 78, 12, false);
-        setA(1); setC(GREEN); rrect(16, 16, 336, 78, 12, true);
-        txt(28, 24, '<KD/>', Math.min(1.6, 76 / strW('<KD/>')));
-        setC(WHITE); txt(110, 24, GL_.name + '   Lv ' + lvl, Math.min(1, 212 / strW(GL_.name + '   Lv ' + lvl)));
-        setC(rgb(40, 46, 58)); rect(110, 50, 322, 62);
-        setC(GREEN); rect(110, 50, 110 + 212 * clamp(fr, 0, 1), 62);
-        setC(GREY); txt(110, 63, GL_.exp + ' / ' + next + ' EXP', 0.8);
-
-        setA(0.85); setC(DARK); rrect(16, 84, 336, 110, 10, false);
-        setA(1); setC(GREY); txt(28, 89, dateText());
-        setC(GREEN); halign = 'right'; txt(326, 89, timeText()); halign = 'left';
-        drawHealthHud();
+        drawPlayerHud();
 
         // corner buttons
         const cb = this.chat_btn, gb = this.gear_btn, db = this.discord_btn;
@@ -1876,11 +1880,22 @@ const G = {
             setC(WHITE); txt(px1 + 50, 610, prompt, 1.3);
         }
 
-        // weapon bar + lab map (bottom right)
+        // Desktop: map under the corner controls, then the weapon grid.
         if (!this.select_open) {
-            let barY2 = 720 - 16;
-            if (GL_.minimap === 1) barY2 = minimapDraw(1280 - 24, 720 - 24, 240, 130, false) - 8;
-            if (!IS_TOUCH || GL_.minimap !== 1) drawWeaponBar(barY2);
+            if (!IS_TOUCH) {
+                let weaponTop = 100;
+                if (GL_.minimap === 1) {
+                    const mapHeight = R.h * Math.min(240 / R.w, 130 / R.h);
+                    const mapBottom = 80 + 32 + mapHeight;
+                    minimapDraw(1280 - 24, mapBottom, 240, 130, false);
+                    weaponTop = mapBottom + 40;
+                }
+                drawWeaponBar(weaponTop + 76);
+            } else {
+                let barY2 = 720 - 16;
+                if (GL_.minimap === 1) barY2 = minimapDraw(1280 - 24, 720 - 24, 240, 130, false) - 8;
+                if (GL_.minimap !== 1) drawWeaponBar(barY2);
+            }
             if (GL_.minimap === 2) minimapDraw(0, 0, 900, 440, true);
         }
         for (const s of R.show) showcaseGui(s);
@@ -2060,7 +2075,7 @@ const G = {
         setA(0.97); setC(DARK); rrect(this.cz_x1, this.cz_y1, this.cz_x2, this.cz_y2, 16, false);
         setA(1); setC(GREEN); rrect(this.cz_x1, this.cz_y1, this.cz_x2, this.cz_y2, 16, true);
         txt(100, 54, 'Character Customiser', 2);
-        setC(GREY); halign = 'right'; txt(this.cz_x2 - 30, 64, '<KD/>  mix any hair, face, skin and outfit'); halign = 'left';
+        setC(GREY); halign = 'right'; txt(this.cz_x2 - 30, 64, 'Mix any hair, face, skin and outfit'); halign = 'left';
 
         const bx1 = 100, by1 = 108, bx2 = 440, by2 = 580;
         const topC = CD.top_cols[cl.top_col];
@@ -3890,24 +3905,36 @@ function nameplate(wx, wy, name, look, hp, hpMax, col, ko, showHealth = true) {
 }
 
 // ---------------- HUD: health, abilities, weapon bar ----------------
-function drawHealthHud() {
+function drawPlayerHud() {
     const p = R.player;
     if (!p) return;
-    setA(0.85); setC(DARK); rrect(16, 116, 336, 164, 10);
-    setA(1); setC(GREEN); rrect(16, 116, 336, 164, 10, true);
-    setC(rgb(34, 42, 56)); rrect(24, 120, 64, 160, 8);
-    faceIcon(26, 122, p.look, 36);
-    setC(GREEN); rrect(24, 120, 64, 160, 8, true);
-    const f = clamp(p.hp / p.hp_max, 0, 1);
-    setC(WHITE); txt(76, 121, 'HP', 0.8);
-    halign = 'right'; setC(GREY); txt(326, 121, Math.ceil(p.hp) + ' / ' + p.hp_max, 0.8); halign = 'left';
-    setC(rgb(40, 46, 58)); rect(76, 140, 326, 154);
-    setC(hpColour(f)); rect(76, 140, 76 + 250 * f, 154);
-    if (p.hit_flash > 0) { setA(p.hit_flash / 10); setC(WHITE); rect(76, 140, 326, 154, true); setA(1); }
+    const lvl = levelFromExp(GL_.exp), cur = expForLevel(lvl), next = expForLevel(lvl + 1);
+    const xp = clamp((GL_.exp - cur) / (next - cur), 0, 1);
+    const hp = clamp(p.hp / p.hp_max, 0, 1);
+    setA(0.9); setC(DARK); rrect(16, 16, 336, 112, 12);
+    setA(1); setC(GREEN); rrect(16, 16, 336, 112, 12, true);
+    drawBrandLogo(28, 40, 52);
+
+    const levelText = 'Lv ' + lvl, levelWidth = strW(levelText) * 0.8;
+    setC(WHITE); txt(96, 26, GL_.name, Math.min(1, (216 - levelWidth - 12) / Math.max(1, strW(GL_.name))));
+    halign = 'right'; setC(GREEN); txt(324, 27, levelText, 0.8); halign = 'left';
+    setC(WHITE); txt(96, 48, 'HP', 0.7);
+    halign = 'right'; setC(GREY); txt(324, 48, Math.ceil(p.hp) + ' / ' + p.hp_max, 0.7); halign = 'left';
+    setC(rgb(40, 46, 58)); rect(96, 64, 324, 74);
+    setC(hpColour(hp)); rect(96, 64, 96 + 228 * hp, 74);
+    if (p.hit_flash > 0) { setA(p.hit_flash / 10); setC(WHITE); rect(96, 64, 324, 74, true); setA(1); }
+    setC(GREY); txt(96, 81, 'XP', 0.6);
+    halign = 'right'; txt(324, 81, GL_.exp + ' / ' + next, 0.6); halign = 'left';
+    setC(rgb(40, 46, 58)); rect(96, 96, 324, 100);
+    setC(GREEN); rect(96, 96, 96 + 228 * xp, 100);
+
+    setA(0.85); setC(DARK); rrect(16, 118, 336, 144, 10);
+    setA(1); setC(GREY); txt(28, 123, dateText());
+    setC(GREEN); halign = 'right'; txt(326, 123, timeText()); halign = 'left';
     const ab = [['F', 'Shield', p.shield_cd, 8 * 60, rgb(98, 200, 244)], ['H', 'Heal', p.heal_cd, 10 * 60, rgb(98, 226, 106)],
                 ['G', 'x' + GL_.grenades, p.grenade_cd, 50, rgb(150, 220, 120)]];
     for (let i = 0; i < 3; i++) {
-        const ax = 16 + i * 108, ay = 170, aw = 104;
+        const ax = 16 + i * 108, ay = 150, aw = 104;
         let ready = ab[i][2] <= 0;
         if (i === 2 && GL_.grenades <= 0) ready = false;
         setA(0.85); setC(DARK); rrect(ax, ay, ax + aw, ay + 30, 10);
@@ -3946,7 +3973,12 @@ function drawWeaponBar(barY2) {
     if (GL_.weapon) {
         let t = WEAPONS[GL_.weapon].name;
         if (!GL_.weapon_out) t += IS_TOUCH ? '  (holstered)' : '  (holstered - Q)';
-        halign = 'right'; setC(WHITE); txt(1280 - 16, y1 - 22, t, 0.9); halign = 'left';
+        if (!IS_TOUCH) {
+            setA(0.88); setC(DARK); rrect(x1, y1 - 28, 1280 - 16, y1 - 6, 6); setA(1);
+        }
+        halign = 'right'; setC(WHITE);
+        txt(1280 - 24, y1 - 22, t, Math.min(0.9, (cols * sz + (cols - 1) * gap - 16) / strW(t)));
+        halign = 'left';
     }
 }
 
@@ -3972,12 +4004,12 @@ function minimapDraw(x2, y2, maxw, maxh, big) {
     setA(1); setC(green); rrect(x1 - pad, top, x2 + pad, y2 + pad + foot, 10, true);
     const ty = top + bar / 2 + 2;
     setC(rgb(235, 64, 80)); circle(x1 + 2, ty, 3); setC(rgb(255, 196, 60)); circle(x1 + 11, ty, 3); setC(green); circle(x1 + 20, ty, 3);
-    txt(x1 + 30, ty - 9 * txs, '<KD/> ' + (MAP_FILE[R.name] || 'char_lab.map'), txs);
-    if (R.player) {
-        halign = 'right'; setC(grey);
-        txt(x2, ty - 8 * txs, '[' + Math.floor(R.player.x / 16) + ',' + Math.floor(R.player.y / 16) + ']' + (IS_TOUCH ? '' : '  M'), txs * 0.9);
-        halign = 'left';
-    }
+    drawBrandLogo(x1 + 30, ty - 7, 18);
+    const mapName = MAP_FILE[R.name] || 'char_lab.map';
+    const mapHint = big && R.player ? '[' + Math.floor(R.player.x / 16) + ',' + Math.floor(R.player.y / 16) + ']' + (IS_TOUCH ? '' : '  M') : (IS_TOUCH ? '' : 'M');
+    const hintWidth = strW(mapHint) * txs * 0.9;
+    txt(x1 + 54, ty - 9 * txs, mapName, Math.min(txs, (w - 64 - hintWidth) / strW(mapName)));
+    halign = 'right'; setC(grey); txt(x2, ty - 8 * txs, mapHint, txs * 0.9); halign = 'left';
     LW = 1;
     setC(dim); line(x1 - pad, top + bar, x2 + pad, top + bar, 1);
     setA(0.35);
@@ -4083,10 +4115,7 @@ function titleDraw(T) {
     setA(0.35); setC(BLACK); rect(0, 0, 1280, 380); setA(1);
     const bob = Math.sin(T.t / 40) * 6;
     halign = 'center';
-    setC(GREEN); setA(0.18);
-    for (let a = 0; a < 360; a += 45) txt(640 + ldx(5, a), 120 + bob + ldy(5, a), '<KD/>', 7);
-    setA(1); setC(rgb(16, 60, 34)); txt(645, 125 + bob, '<KD/>', 7);
-    setC(GREEN); txt(640, 120 + bob, '<KD/>', 7);
+    drawBrandLogo(532, 74 + bob, 216);
     setC(WHITE); txt(640, 262 + bob, 'K R A C K E D D E V S   L A B', 2);
     setC(GREY); txt(640, 312, 'Learn. Build. Ship.', 1.3);
     for (let i = 0; i < T.menu.length; i++) {
@@ -4657,7 +4686,7 @@ if (presence) {
     });
 }
 
-loadSprites().then(() => {
+Promise.all([loadSprites(), loadBrandLogo()]).then(() => {
     audioInit();
     glInit();
     layout();
