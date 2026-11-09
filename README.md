@@ -8,9 +8,15 @@ KD Discord members can sign in and see other signed-in members in the same game 
 
 The backend reuses the KD Square OAuth application and checks membership in guild `1445246968367677573`. Its registered game callback is `https://game.krackeddevs.com/auth/callback`.
 
+## Saved characters
+
+Choose **Save & Wear** in the Character Customiser to save all clothing, hair, face and colour choices. Signed-in KD members save to their Discord account and restore that outfit on another browser or device. Guests save to the current browser. A local pending copy retries account saves after reconnection or the next visit.
+
+The authenticated `GET` / `PUT /api/character` endpoint stores only appearance in a per-member `PlayerProfile` Durable Object. Sign-out leaves the account outfit intact and returns to the guest outfit. The `v2` migration adds `PLAYER_PROFILES` without replacing the existing sessions or game rooms.
+
 ## Checks
 
-From `server`, run `npm ci` and `npm test`. The tests exercise OAuth state, membership checks, session revocation, room presence, duplicate tabs and the previous-domain redirect.
+From `server`, run `npm ci` and `npm test`. The tests exercise OAuth state, membership checks, session revocation, room presence, duplicate tabs, nonlethal hits, saved outfit restoration, account isolation, retries, and the previous-domain redirect.
 
 ## Deploy
 

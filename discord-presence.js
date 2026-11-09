@@ -27,6 +27,59 @@
         return { x: value.x, y: value.y, facing: value.facing, state: value.state, frame: value.frame, look };
     }
 
+    function validCharacterLook(value) {
+        if (!value || typeof value !== 'object' || Array.isArray(value) ||
+            Object.keys(value).length !== Object.keys(LOOK_LIMITS).length) return null;
+        const look = {};
+        for (const [key, max] of Object.entries(LOOK_LIMITS)) {
+            const number = value[key];
+            if (!Object.hasOwn(value, key) || !Number.isInteger(number) || number < 0 || number > max) return null;
+            look[key] = number;
+        }
+        return look;
+    }
+
+    async function requestCharacter(method, look) {
+        const identity = user?.id, version = authVersion;
+        if (!identity || loggingOut) throw new Error('sign_in_required');
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 10000);
+        try {
+            const options = {
+                method, credentials: 'same-origin', cache: 'no-store',
+                headers: { Accept: 'application/json' }, signal: controller.signal
+            };
+            if (method === 'PUT') {
+                options.headers['Content-Type'] = 'application/json';
+                options.body = JSON.stringify({ look });
+            }
+            const response = await fetch('/api/character', options);
+            if (!response.ok) throw new Error('character_unavailable');
+            const data = await response.json();
+            if (user?.id !== identity || authVersion !== version) throw new Error('character_identity_changed');
+            if (method === 'GET' && data?.look === null && data.updatedAt === null) {
+                return { look: null, updatedAt: null };
+            }
+            const savedLook = validCharacterLook(data?.look);
+            if (!savedLook || !Number.isSafeInteger(data.updatedAt) || data.updatedAt <= 0) {
+                throw new Error('invalid_character_response');
+            }
+            return { look: savedLook, updatedAt: data.updatedAt };
+        } finally {
+            clearTimeout(timeout);
+        }
+    }
+
+    function loadCharacter() {
+        return requestCharacter('GET');
+    }
+
+    async function saveCharacter(value) {
+        const look = validCharacterLook(value);
+        if (!look) throw new Error('invalid_character');
+        return requestCharacter('PUT', look);
+    }
+
     function acceptPlayer(value) {
         if (!value || typeof value.id !== 'string' || typeof value.name !== 'string' || value.id === user?.id) return;
         const state = value.state === null ? null : validState(value.state);
@@ -377,7 +430,7 @@
     }
 
     window.KD_PRESENCE = {
-        init, update, reportHit,
+        init, update, reportHit, loadCharacter, saveCharacter,
         enterGame() { if (panel) { document.body.append(panel); panel.classList.add('floating'); } },
         get user() { return user; },
         players() {

@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdtemp, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { Miniflare, Log, LogLevel, convertV4MiniflareOptions } from "miniflare";
 
 const ORIGIN = "https://game.krackeddevs.com";
@@ -16,7 +18,7 @@ const appearance = {
   hair: 0, hair_col: 0, face: 0, skin: 1, top: 0, top_col: 0, bottom: 0, bottom_col: 0,
 };
 
-async function runtime(t, { legacyAttachments = false } = {}) {
+async function runtime(t, { legacyAttachments = false, persistencePath } = {}) {
   const scriptOptions = { scriptPath: new URL("../worker.js", import.meta.url).pathname, modules: true };
   if (legacyAttachments) {
     const source = await readFile(new URL("../worker.js", import.meta.url), "utf8");
@@ -41,6 +43,7 @@ export class GameRoom extends GameRoomBase {
     compatibilityDate: "2026-11-09",
     compatibilityFlags: ["nodejs_compat"],
     log: new Log(LogLevel.ERROR),
+    resourcePersistencePath: persistencePath,
     bindings: {
       APP_ORIGIN: ORIGIN,
       LEGACY_ORIGIN: "https://platform.danialalias.com",
@@ -51,6 +54,7 @@ export class GameRoom extends GameRoomBase {
     durableObjects: {
       AUTH_SESSIONS: { className: "AuthSession", useSQLite: true },
       ROOMS: { className: "GameRoom", useSQLite: true },
+      PLAYER_PROFILES: { className: "PlayerProfile", useSQLite: true },
     },
     outboundService: async request => {
       const url = new URL(request.url);
@@ -549,4 +553,120 @@ test("a full precision 16-hit batch fits the bounded packet envelope", async t =
   const event = await until(a, "hits");
   assert.equal(event.hits.length, 1);
   assert.equal(event.hits[0].targetId, users.bob.id);
+});
+
+
+function characterRequest(mf, session, { method = "GET", payload, body, origin = ORIGIN, contentType = "application/json", headers = {} } = {}) {
+  return mf.dispatchFetch(ORIGIN + "/api/character", {
+    method, duplex: "half",
+    headers: { Cookie: session || "", Origin: origin, "Content-Type": contentType, ...headers },
+    ...(method === "GET" ? {} : { body: body ?? JSON.stringify(payload) }),
+  });
+}
+
+test("character outfits persist across sessions and logout while staying account-isolated", async t => {
+  const { mf } = await runtime(t);
+  const alice = await signIn(mf, "alice");
+  const bob = await signIn(mf, "bob");
+  const empty = await characterRequest(mf, alice.cookie);
+  assert.equal(empty.status, 200);
+  assert.deepEqual(await empty.json(), { look: null, updatedAt: null });
+  assert.equal(empty.headers.get("Cache-Control"), "no-store");
+
+  const outfit = { ...appearance, hair: 5, face: 5, top: 4, top_col: 9, bottom: 2, bottom_col: 7 };
+  const response = await characterRequest(mf, alice.cookie, { method: "PUT", payload: { look: outfit } });
+  assert.equal(response.status, 200);
+  const saved = await response.json();
+  assert.deepEqual(saved.look, outfit);
+  assert.ok(Number.isFinite(saved.updatedAt));
+  assert.ok(Math.abs(Date.now() - saved.updatedAt) < 5000);
+  assert.deepEqual(Object.keys(saved).sort(), ["look", "updatedAt"]);
+  const newSession = await signIn(mf, "alice");
+  assert.notEqual(newSession.cookie, alice.cookie);
+  assert.deepEqual(await (await characterRequest(mf, newSession.cookie)).json(), saved);
+  assert.deepEqual(await (await characterRequest(mf, bob.cookie)).json(), { look: null, updatedAt: null });
+
+  const forged = await characterRequest(mf, bob.cookie, {
+    method: "PUT", payload: { look: appearance, userId: users.alice.id },
+  });
+  assert.equal(forged.status, 400);
+  assert.deepEqual(await (await characterRequest(mf, newSession.cookie)).json(), saved);
+  await mf.dispatchFetch(ORIGIN + "/auth/logout", {
+    method: "POST", headers: { Cookie: alice.cookie, Origin: ORIGIN },
+  });
+  assert.equal((await characterRequest(mf, alice.cookie)).status, 401);
+  assert.deepEqual(await (await characterRequest(mf, newSession.cookie)).json(), saved);
+  const returning = await signIn(mf, "alice");
+  assert.deepEqual(await (await characterRequest(mf, returning.cookie)).json(), saved);
+});
+
+test("character writes reject cross-origin, invalid and oversized data without replacing an outfit", async t => {
+  const { mf } = await runtime(t);
+  assert.equal((await characterRequest(mf, null)).status, 401);
+  assert.equal((await characterRequest(mf, null, { method: "PUT", payload: { look: appearance } })).status, 401);
+  const alice = await signIn(mf);
+  const valid = await characterRequest(mf, alice.cookie, { method: "PUT", payload: { look: appearance } });
+  const saved = await valid.json();
+  assert.equal((await characterRequest(mf, alice.cookie, {
+    method: "PUT", payload: { look: appearance }, origin: "https://other.example",
+  })).status, 403);
+  assert.equal((await characterRequest(mf, alice.cookie, { origin: "https://other.example" })).status, 403);
+  assert.equal((await characterRequest(mf, alice.cookie, {
+    method: "PUT", payload: { look: appearance }, origin: "",
+  })).status, 403);
+  assert.equal((await characterRequest(mf, alice.cookie, {
+    method: "PUT", payload: { look: appearance }, contentType: "text/plain",
+  })).status, 415);
+  const unsupported = await characterRequest(mf, alice.cookie, { method: "POST", payload: { look: appearance } });
+  assert.equal(unsupported.status, 405);
+  assert.equal(unsupported.headers.get("Allow"), "GET, PUT");
+
+  for (const payload of [
+    null, [], { look: null }, { look: [] }, { look: { ...appearance, hair: 6 } },
+    { look: { ...appearance, top_col: -1 } }, { look: { ...appearance, face: 1.5 } },
+    { look: { ...appearance, hair: "1" } }, { look: { ...appearance, outfitName: "extra" } },
+    { look: { hair: 0 } }, { look: appearance, userId: users.bob.id },
+  ]) {
+    const invalid = await characterRequest(mf, alice.cookie, { method: "PUT", payload });
+    assert.equal(invalid.status, 400, JSON.stringify(payload));
+  }
+  assert.equal((await characterRequest(mf, alice.cookie, { method: "PUT", body: "{" })).status, 400);
+  assert.equal((await characterRequest(mf, alice.cookie, {
+    method: "PUT", body: JSON.stringify({ look: appearance, padding: "x".repeat(1024) }),
+  })).status, 413);
+  const streamed = new ReadableStream({
+    start(controller) {
+      controller.enqueue(new TextEncoder().encode(" ".repeat(600)));
+      controller.enqueue(new TextEncoder().encode(" ".repeat(600)));
+      controller.close();
+    },
+  });
+  assert.equal((await characterRequest(mf, alice.cookie, { method: "PUT", body: streamed })).status, 413);
+  assert.deepEqual(await (await characterRequest(mf, alice.cookie)).json(), saved);
+});
+
+test("character access rechecks membership and persisted outfits survive a runtime restart", async t => {
+  const persistencePath = await mkdtemp(join(tmpdir(), "kd-character-test-"));
+  t.after(() => rm(persistencePath, { recursive: true, force: true }));
+  const first = await runtime(t, { persistencePath });
+  const alice = await signIn(first.mf);
+  const outfit = { ...appearance, top: 3, top_col: 8 };
+  const saved = await (await characterRequest(first.mf, alice.cookie, { method: "PUT", payload: { look: outfit } })).json();
+  await first.mf.dispose();
+  const second = await runtime(t, { persistencePath });
+  assert.deepEqual(await (await characterRequest(second.mf, alice.cookie)).json(), saved);
+
+  const sessions = await second.mf.getDurableObjectNamespace("AUTH_SESSIONS");
+  const oldSession = "c".repeat(64);
+  await sessions.get(sessions.idFromName(oldSession)).createSession({
+    accessToken: "alice", discordUser: users.alice,
+    user: { id: users.alice.id, name: "KD Alice", avatar: "" },
+    checkedAt: Date.now() - 6 * 60 * 1000, expiresAt: Date.now() + 3600000,
+  });
+  second.state.membershipStatus = 404;
+  const revoked = "__Host-kd_session=" + oldSession;
+  assert.equal((await characterRequest(second.mf, revoked)).status, 401);
+  assert.equal((await characterRequest(second.mf, revoked, { method: "PUT", payload: { look: appearance } })).status, 401);
+  second.state.membershipStatus = 200;
+  assert.deepEqual(await (await characterRequest(second.mf, alice.cookie)).json(), saved);
 });

@@ -1910,7 +1910,7 @@ const G = {
             if (confirm) {
                 GL_.look = lookCopy(this.cz_look);
                 if (R.player) R.player.look = lookCopy(GL_.look);
-                kdToast('New look saved!', GREEN);
+                saveChosenCharacter();
                 kdSfx('snd_confirm');
                 if (this.first_select) { this.first_select = false; kdAddExp(20, 'Customised your builder'); }
                 this.select_open = false;
@@ -2372,7 +2372,7 @@ const G = {
             setC(WHITE); halign = 'center'; txt(px + 48, 542, pr.name); halign = 'left';
         }
         const btns = [[this.cz_btn_random, IS_TOUCH ? 'Randomise' : 'Randomise (R)', false], [this.cz_btn_reset, 'Reset', false],
-                      [this.cz_btn_cancel, 'Cancel', false], [this.cz_btn_wear, IS_TOUCH ? 'WEAR' : 'WEAR (Enter)', true]];
+                      [this.cz_btn_cancel, 'Cancel', false], [this.cz_btn_wear, 'SAVE & WEAR', true]];
         for (const [r, label, main] of btns) {
             const hb = hov(r);
             if (main) setC(hb ? merge(GREEN, WHITE, 0.3) : GREEN);
@@ -5004,15 +5004,138 @@ function hudAction(action) {
 
 window.KD_GAME = { vkey, touchFire, touchFireAim, hudAction, IS_TOUCH, layout, M, start: null, debug: { G, GL_, get R() { return R; }, cam, roomGoto: n => roomGoto(n), get VIEW() { return [VIEW_W, VIEW_H]; } } };
 
-// Keep a chosen character through the Discord redirect without storing auth data.
+// Persistent outfits are isolated by Discord account; guests stay on this browser.
+const CHARACTER_STORAGE_PREFIX = 'kd-character-v1:';
+const characterCache = new Map(), characterSaves = new Map();
+let characterAccount = null, characterEpoch = 0, characterIdentityReady = false;
+let characterEditedBeforeIdentity = false;
+function validCharacterLook(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return null;
+    const look = {};
+    for (const slot of SLOTS) {
+        const v = value[slot.key];
+        if (!Number.isInteger(v) || v < 0 || v >= slot.names.length) return null;
+        look[slot.key] = v;
+    }
+    return look;
+}
+function characterKey(account) { return CHARACTER_STORAGE_PREFIX + (account || 'guest'); }
+function getSavedCharacter(account) {
+    const key = characterKey(account);
+    if (characterCache.has(key)) return characterCache.get(key);
+    let record = null;
+    try {
+        const data = JSON.parse(localStorage.getItem(key));
+        const look = validCharacterLook(data?.look);
+        if (look) record = { look, pending: data.pending === true, updatedAt: Number(data.updatedAt) || 0, deviceSaved: true };
+    } catch {}
+    characterCache.set(key, record);
+    return record;
+}
+function storeCharacter(account, record) {
+    characterCache.set(characterKey(account), record);
+    try {
+        localStorage.setItem(characterKey(account), JSON.stringify({ look: record.look, pending: record.pending, updatedAt: record.updatedAt }));
+        record.deviceSaved = true;
+    } catch { record.deviceSaved = false; }
+    return record;
+}
+function applySavedCharacter(look) {
+    GL_.look = lookCopy(look);
+    if (R?.player) R.player.look = lookCopy(look);
+}
+async function flushCharacterSave(account, announce = false) {
+    if (!account || presence?.user?.id !== account || characterSaves.has(account)) return;
+    characterSaves.set(account, true);
+    try {
+        while (presence?.user?.id === account) {
+            const record = getSavedCharacter(account);
+            if (!record?.pending) break;
+            try {
+                const saved = await presence.saveCharacter(record.look);
+                if (getSavedCharacter(account) !== record) continue;
+                storeCharacter(account, { look: saved.look, updatedAt: saved.updatedAt, pending: false });
+                if ((announce || record.announce) && characterAccount === account) kdToast('Outfit saved to your Discord account', GREEN);
+            } catch {
+                if ((announce || record.announce) && characterAccount === account) {
+                    kdToast(record.deviceSaved ? 'Saved on this device · account sync pending' : 'Could not save outfit · reconnect and choose Save & Wear', GREY);
+                }
+                break;
+            }
+        }
+    } finally { characterSaves.delete(account); }
+}
+function saveChosenCharacter() {
+    const look = validCharacterLook(GL_.look);
+    if (!look) return;
+    ++characterEpoch;
+    if (!characterIdentityReady) characterEditedBeforeIdentity = true;
+    const record = storeCharacter(characterAccount, { look, updatedAt: Date.now(), pending: !!characterAccount, announce: true });
+    if (characterAccount) {
+        kdToast('Saving outfit…', GREY);
+        void flushCharacterSave(characterAccount, true);
+    } else {
+        kdToast(record.deviceSaved ? 'Outfit saved in this browser' : 'Could not save outfit · browser storage is unavailable', record.deviceSaved ? GREEN : GREY);
+    }
+}
+async function restoreAccountCharacter(account, epoch) {
+    const cached = getSavedCharacter(account);
+    if (cached?.pending) { void flushCharacterSave(account); return; }
+    try {
+        const saved = await presence.loadCharacter();
+        if (characterEpoch !== epoch || characterAccount !== account || presence?.user?.id !== account) return;
+        if (saved.look) {
+            storeCharacter(account, { look: saved.look, updatedAt: saved.updatedAt, pending: false });
+            applySavedCharacter(saved.look);
+        } else {
+            // First sign-in adopts the selected guest outfit; later accounts stay separate.
+            const look = validCharacterLook(GL_.look);
+            if (look) {
+                storeCharacter(account, { look, updatedAt: Date.now(), pending: true });
+                void flushCharacterSave(account);
+            }
+        }
+    } catch {
+        if (characterEpoch === epoch && characterAccount === account) {
+            kdToast('Could not load account outfit · using this device', GREY);
+        }
+    }
+}
+function switchCharacterIdentity(identity) {
+    const account = identity?.id || null;
+    if (characterIdentityReady && account === characterAccount) {
+        if (account) void flushCharacterSave(account);
+        return;
+    }
+    const earlyChoice = !characterIdentityReady && characterEditedBeforeIdentity ? validCharacterLook(GL_.look) : null;
+    characterIdentityReady = true;
+    characterEditedBeforeIdentity = false;
+    characterAccount = account;
+    const epoch = ++characterEpoch;
+    if (account && earlyChoice) storeCharacter(account, { look: earlyChoice, updatedAt: Date.now(), pending: true });
+    const saved = getSavedCharacter(account) || getSavedCharacter(null);
+    applySavedCharacter(saved?.look || initialGuestLook);
+    if (account) void restoreAccountCharacter(account, epoch);
+}
+
+const cachedGuestCharacter = getSavedCharacter(null);
+if (cachedGuestCharacter) GL_.look = lookCopy(cachedGuestCharacter.look);
+// Migrate the old redirect-only copy without storing any authentication data.
 try {
     const saved = JSON.parse(sessionStorage.getItem('kd-discord-character'));
-    if (saved?.look && SLOTS.every(slot => Number.isInteger(saved.look[slot.key]) && saved.look[slot.key] >= 0 && saved.look[slot.key] < slot.names.length)) {
-        GL_.look = lookCopy(saved.look);
+    const look = validCharacterLook(saved?.look);
+    if (!cachedGuestCharacter && look) {
+        GL_.look = lookCopy(look);
+        storeCharacter(null, { look, updatedAt: Date.now(), pending: false });
     }
     if (typeof saved?.guestName === 'string') GL_.name = saved.guestName.slice(0, 16);
     sessionStorage.removeItem('kd-discord-character');
 } catch {}
+const initialGuestLook = lookCopy(GL_.look);
+window.addEventListener('online', () => { if (characterAccount) void flushCharacterSave(characterAccount); });
+document.addEventListener('visibilitychange', () => {
+    if (!document.hidden && characterAccount) void flushCharacterSave(characterAccount);
+});
 
 if (presence) {
     let guestName = GL_.name;
@@ -5035,6 +5158,7 @@ if (presence) {
                 GL_.name = guestName;
                 discordIdentity = false;
             }
+            switchCharacterIdentity(identity);
             if (touchSettings.open) refreshTouchName();
         },
         getState() {

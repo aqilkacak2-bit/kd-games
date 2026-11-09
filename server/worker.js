@@ -243,6 +243,67 @@ async function logout(request, env) {
   return response;
 }
 
+const CHARACTER_BODY_LIMIT = 1024;
+
+async function character(request, env) {
+  if (!["GET", "PUT"].includes(request.method)) {
+    return new Response(null, { status: 405, headers: { Allow: "GET, PUT" } });
+  }
+  const origin = request.headers.get("Origin");
+  if ((request.method === "PUT" || origin) && origin !== env.APP_ORIGIN) {
+    return json({ error: "origin_denied" }, 403);
+  }
+  const verified = await verifySession(request, env);
+  if (verified.status !== 200) return json({ error: "sign_in_required" }, verified.status);
+  const profile = env.PLAYER_PROFILES.getByName(env.DISCORD_GUILD_ID + ":" + verified.user.id);
+  if (request.method === "GET") {
+    const saved = await profile.readCharacter();
+    return json(saved || { look: null, updatedAt: null });
+  }
+  if (request.headers.get("Content-Type")?.split(";")[0].trim().toLowerCase() !== "application/json") {
+    return json({ error: "json_required" }, 415);
+  }
+  if (Number(request.headers.get("Content-Length")) > CHARACTER_BODY_LIMIT) {
+    return json({ error: "character_too_large" }, 413);
+  }
+  if (!request.body) return json({ error: "invalid_character" }, 400);
+
+  const reader = request.body.getReader();
+  let payload;
+  try {
+    const chunks = [];
+    let length = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      length += value.byteLength;
+      if (length > CHARACTER_BODY_LIMIT) {
+        await reader.cancel();
+        return json({ error: "character_too_large" }, 413);
+      }
+      chunks.push(value);
+    }
+    const bytes = new Uint8Array(length);
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.byteLength;
+    }
+    payload = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+  } catch {
+    return json({ error: "invalid_character" }, 400);
+  } finally {
+    reader.releaseLock();
+  }
+  const look = validLook(payload?.look);
+  if (!payload || typeof payload !== "object" || Array.isArray(payload) ||
+      Object.keys(payload).length !== 1 || !look ||
+      Object.keys(payload.look).length !== Object.keys(LOOK_LIMITS).length) {
+    return json({ error: "invalid_character" }, 400);
+  }
+  return json(await profile.saveCharacter(look));
+}
+
 async function presence(request, env) {
   if (request.headers.get("Origin") !== env.APP_ORIGIN) {
     return json({ error: "origin_denied" }, 403);
@@ -302,6 +363,7 @@ export default {
       if (url.pathname === "/auth/discord" && methodAllowed(request, "GET")) return await login(request, env);
       if (url.pathname === "/auth/callback" && methodAllowed(request, "GET")) return await callback(request, env);
       if (url.pathname === "/auth/logout" && methodAllowed(request, "POST")) return await logout(request, env);
+      if (url.pathname === "/api/character") return await character(request, env);
       if (url.pathname === "/api/presence" && methodAllowed(request, "GET")) return await presence(request, env);
       return json({ error: "not_found" }, 404);
     } catch (error) {
@@ -389,6 +451,29 @@ export class AuthSession extends DurableObject {
   }
 }
 
+export class PlayerProfile extends DurableObject {
+  async readCharacter() {
+    return await this.ctx.storage.get("character") || null;
+  }
+
+  async saveCharacter(look) {
+    const record = { look, updatedAt: Date.now() };
+    await this.ctx.storage.put("character", record);
+    return record;
+  }
+}
+
+function validLook(value) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const look = {};
+  for (const [key, max] of Object.entries(LOOK_LIMITS)) {
+    const item = value[key];
+    if (!Number.isInteger(item) || item < 0 || item > max) return null;
+    look[key] = item;
+  }
+  return look;
+}
+
 function validState(value, room) {
   if (!value || typeof value !== "object" || Array.isArray(value)) return null;
   const [width, height] = ROOMS[room];
@@ -397,12 +482,8 @@ function validState(value, room) {
       ![1, -1].includes(value.facing) || !["idle", "walk"].includes(value.state) ||
       !Number.isFinite(value.frame) || value.frame < 0 || value.frame >= 6 ||
       !value.look || typeof value.look !== "object") return null;
-  const look = {};
-  for (const [key, max] of Object.entries(LOOK_LIMITS)) {
-    const item = value.look[key];
-    if (!Number.isInteger(item) || item < 0 || item > max) return null;
-    look[key] = item;
-  }
+  const look = validLook(value.look);
+  if (!look) return null;
   return {
     x: Math.round(value.x * 100) / 100,
     y: Math.round(value.y * 100) / 100,
