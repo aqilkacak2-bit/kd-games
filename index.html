@@ -9,11 +9,20 @@
 <meta name="theme-color" content="#0b0e13">
 <title>KDlab1</title>
 <style>
-:root { color-scheme: dark; --green: #40e26e; --dark: #12161e; --grey: #a0a8b4; }
+:root {
+    color-scheme: dark;
+    --green: #40e26e;
+    --dark: #12161e;
+    --grey: #a0a8b4;
+    --safe-top: env(safe-area-inset-top, 0px);
+    --safe-right: env(safe-area-inset-right, 0px);
+    --safe-bottom: env(safe-area-inset-bottom, 0px);
+    --safe-left: env(safe-area-inset-left, 0px);
+}
 html, body { margin: 0; height: 100%; background: #0b0e13; overflow: hidden; }
-body { touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+body { user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
        -webkit-tap-highlight-color: transparent; font-family: "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; color: #fff; }
-canvas { position: fixed; display: block; }
+canvas { position: fixed; display: block; touch-action: none; }
 #view { image-rendering: auto; background: #000; }
 #gui { z-index: 2; }
 
@@ -24,76 +33,200 @@ canvas { position: fixed; display: block; }
            caret-color: var(--green); font-size: 16px; }
 
 /* ---------------- touch controls ---------------- */
-#touch { position: fixed; inset: 0; z-index: 10; pointer-events: none; display: none; }
-body.touch.loaded #touch { display: block; }
-#touch.hidden .ctl { opacity: 0; pointer-events: none; }
-.ctl { position: fixed; pointer-events: auto; transition: opacity .15s; }
-#joy { width: 150px; height: 150px; border-radius: 50%; background: rgba(18,22,30,.45); border: 2px solid rgba(64,226,110,.55);
-       box-sizing: border-box; }
-#knob { position: absolute; left: 50%; top: 50%; width: 62px; height: 62px; margin: -31px 0 0 -31px; border-radius: 50%;
-        background: rgba(64,226,110,.75); box-shadow: 0 0 12px rgba(64,226,110,.5); pointer-events: none; }
-#joy.run #knob { background: rgba(255,214,90,.9); box-shadow: 0 0 14px rgba(255,214,90,.6); }
-.btn { border-radius: 50%; background: rgba(18,22,30,.6); border: 2px solid rgba(255,255,255,.55); box-sizing: border-box;
-       display: flex; align-items: center; justify-content: center; font-weight: 700; color: #fff; font-size: 15px; letter-spacing: .5px; }
-.btn.down { background: rgba(64,226,110,.85); border-color: var(--green); color: #12161e; }
-.btn small { display: block; font-size: 10px; font-weight: 600; opacity: .8; }
-.btn .in { text-align: center; line-height: 1.05; pointer-events: none; }
-#b-jump { width: 84px; height: 84px; font-size: 16px; border-color: rgba(64,226,110,.8); }
-#b-e, #b-dash { width: 64px; height: 64px; }
-#b-q { width: 54px; height: 54px; font-size: 13px; }
-.sbtn { width: 50px; height: 50px; font-size: 14px; }
-.sbtn small { font-size: 9px; }
-#b-f.down { background: rgba(98,200,244,.85); } #b-h.down { background: rgba(98,226,106,.85); } #b-g.down { background: rgba(150,220,120,.85); }
-#b-fs { width: 40px; height: 40px; border-radius: 10px; font-size: 18px; }
-#b-q.off { display: none; }
-body:not(.portrait) .ctl { opacity: .82; }
-#dlink { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); padding: 12px 20px; border-radius: 12px; background: #5865f2; color: #fff; font-weight: 700; text-decoration: none; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
+#touch, #touch-hud { position: fixed; z-index: 10; pointer-events: none; display: none; }
+#touch {
+    inset: 0;
+    --joy-size: clamp(96px, 28vmin, 128px);
+    --fire-size: clamp(60px, 17vmin, 76px);
+    --touch-side: 12px;
+    --main-control-height: max(var(--joy-size), calc(52px + var(--fire-size)));
+    --touch-bottom: calc(var(--safe-bottom) + 12px);
+}
+body.touch.loaded #touch:not(.hidden) { display: block; }
+body.touch.loaded:not(.touch-hud-hidden) #touch-hud { display: flex; }
+.ctl { pointer-events: auto; touch-action: none; }
+#joy {
+    position: absolute; left: calc(var(--safe-left) + var(--touch-side)); bottom: var(--touch-bottom);
+    width: var(--joy-size); height: var(--joy-size); border-radius: 50%; background: rgba(18,22,30,.65);
+    border: 2px solid rgba(64,226,110,.65); box-sizing: border-box;
+}
+#knob { position: absolute; left: 30%; top: 30%; width: 40%; height: 40%; border-radius: 50%;
+        background: rgba(64,226,110,.8); pointer-events: none; }
+#joy.run #knob { background: rgba(255,214,90,.9); }
+#touch-actions, #touch-tools, #touch-hud { gap: 8px; }
+#touch-actions, #touch-tools { position: absolute; display: grid; }
+#touch-actions {
+    right: calc(var(--safe-right) + var(--touch-side)); bottom: var(--touch-bottom);
+    grid-template-columns: 56px var(--fire-size); align-items: end; justify-items: center;
+}
+#touch-tools {
+    grid-template-columns: repeat(3, 44px);
+    left: 50%; bottom: var(--touch-bottom); transform: translateX(-50%);
+}
+#touch-hud { top: calc(var(--safe-top) + 8px); right: calc(var(--safe-right) + 8px); }
+body.portrait #touch-hud {
+    top: calc(var(--stage-bottom) + 8px); left: calc(var(--safe-left) + 8px);
+    right: calc(var(--safe-right) + 8px); justify-content: center;
+}
+body.portrait #touch-tools {
+    grid-template-columns: repeat(5, 44px);
+    top: max(calc(var(--stage-bottom) + 60px), calc(100% - var(--touch-bottom) - var(--main-control-height) - 52px));
+    bottom: auto;
+}
+@media (min-width: 740px) and (orientation: landscape) {
+    #touch-tools { grid-template-columns: repeat(5, 44px); }
+}
+.btn {
+    appearance: none; display: grid; place-items: center; min-width: 44px; min-height: 44px;
+    padding: 0; border: 1px solid rgba(255,255,255,.65); border-radius: 12px;
+    background: rgba(18,22,30,.86); color: #fff;
+    font-family: inherit; font-size: 12px; font-weight: 700; line-height: 1.1;
+    text-align: center; cursor: pointer;
+}
+.btn.down, .btn:active { background: var(--green); border-color: var(--green); color: var(--dark); }
+.btn:focus-visible, #go:focus-visible, #dlink:focus-visible { outline: 2px solid #86efa6; outline-offset: 3px; }
+.btn small { display: block; margin-top: 2px; font-size: 10px; }
+.btn .in { pointer-events: none; }
+#b-jump, #b-fire { border-radius: 50%; border-color: var(--green); }
+#b-jump { width: 56px; height: 56px; }
+#b-fire { width: var(--fire-size); height: var(--fire-size); }
+#b-q.off { visibility: hidden; pointer-events: none; }
+#b-fs, #b-discord, #b-chat, #b-settings { font-size: 20px; }
+#dlink {
+    position: fixed; z-index: 30; left: 50%; transform: translateX(-50%);
+    bottom: calc(24px + var(--safe-bottom)); width: max-content; max-width: calc(100% - 32px);
+    box-sizing: border-box; min-height: 44px; padding: 12px 20px; border-radius: 12px;
+    background: #5865f2; color: #fff; font-weight: 700; text-align: center; text-decoration: none;
+    box-shadow: 0 6px 24px rgba(0,0,0,.5);
+}
 #dlink[hidden] { display: none; }
-#hint { position: fixed; z-index: 9; color: var(--grey); font-size: 12px; text-align: center; pointer-events: none; display: none; }
-body.touch.portrait.loaded #dlink { position: fixed; z-index: 30; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); padding: 12px 20px; border-radius: 12px; background: #5865f2; color: #fff; font-weight: 700; text-decoration: none; box-shadow: 0 6px 24px rgba(0,0,0,.5); }
-#dlink[hidden] { display: none; }
-body.touch.portrait.loaded #hint { display: block; }
 
 /* ---------------- start screen ---------------- */
 #start { position: fixed; inset: 0; z-index: 50; display: flex; align-items: center; justify-content: center;
-         background: radial-gradient(ellipse at center, rgba(18,30,24,.92), rgba(6,8,12,.97)); padding: 16px; box-sizing: border-box; }
+         background: radial-gradient(ellipse at center, rgba(18,30,24,.92), rgba(6,8,12,.97));
+         padding: max(12px, var(--safe-top)) max(12px, var(--safe-right)) max(12px, var(--safe-bottom)) max(12px, var(--safe-left));
+         box-sizing: border-box; touch-action: pan-y; }
 #start.gone { display: none; }
 .card { max-width: 560px; width: 100%; background: rgba(18,22,30,.95); border: 2px solid var(--green); border-radius: 16px;
-        padding: 24px 24px 20px; box-sizing: border-box; box-shadow: 0 0 40px rgba(64,226,110,.15); max-height: 100%; overflow: auto; }
+        padding: clamp(12px, 4vmin, 24px); box-sizing: border-box; box-shadow: 0 0 40px rgba(64,226,110,.15);
+        max-height: 100%; overflow: auto; overscroll-behavior: contain; }
 .logo { display: block; width: 80px; height: 60px; overflow: visible; }
 .card h1 { margin: 10px 0 2px; font-size: 22px; }
 .card .sub { color: var(--grey); font-size: 14px; margin-bottom: 16px; }
 .keys { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 14px; margin-bottom: 18px; }
 .keys b { color: var(--green); white-space: nowrap; font-weight: 700; }
 .keys span { color: #d8dde6; }
-#go { width: 100%; padding: 14px; font-size: 17px; font-weight: 700; font-family: inherit; color: #12161e; background: var(--green);
+#go { width: 100%; min-height: 44px; padding: 12px; font-size: 17px; font-weight: 700; font-family: inherit; color: #12161e; background: var(--green);
       border: 0; border-radius: 12px; cursor: pointer; }
 #go:disabled { background: #2a3a30; color: var(--grey); cursor: wait; }
 .pc-only, .touch-only { display: none; }
-body:not(.touch) .pc-only { display: contents; }
+body:not(.touch) .keys.pc-only { display: grid; }
 body.touch .touch-only { display: contents; }
-.rot { color: var(--grey); font-size: 12px; margin-top: 10px; text-align: center; }
+.rot { color: var(--grey); font-size: 13px; margin-top: 10px; text-align: center; }
+body.touch .rot { display: block; }
+body.touch #touch-guide { display: block; margin-top: 12px; color: var(--grey); }
+#touch-guide { display: none; }
+#touch-guide summary { min-height: 44px; box-sizing: border-box; padding: 12px 8px; cursor: pointer; }
+#touch-guide .keys { padding: 4px 8px; }
+#touch-settings {
+    width: min(420px, calc(100% - var(--safe-left) - var(--safe-right) - 24px));
+    max-height: calc(100% - var(--safe-top) - var(--safe-bottom) - 24px);
+    box-sizing: border-box; padding: 16px; border: 2px solid var(--green); border-radius: 16px;
+    background: var(--dark); color: #fff; overscroll-behavior: contain; touch-action: pan-y;
+}
+#touch-settings::backdrop { background: rgba(6,8,12,.72); }
+#touch-settings header { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 12px; }
+#touch-settings h2 { margin: 0; font-size: 20px; }
+#touch-settings label { display: block; margin-bottom: 8px; font-size: 14px; }
+#touch-settings input {
+    width: 100%; min-height: 44px; margin-bottom: 12px; padding: 8px 12px; box-sizing: border-box;
+    border: 1px solid #7d8792; border-radius: 8px; background: #222a38; color: #fff; font: inherit; user-select: text; -webkit-user-select: text;
+}
+#touch-settings input[readonly] { opacity: .8; }
+#touch-settings input:focus-visible, #touch-guide summary:focus-visible { outline: 2px solid #86efa6; outline-offset: 2px; }
+#touch-settings-options { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+#touch-settings .btn { padding-inline: 8px; }
+#touch-settings-options .btn { grid-template-columns: 1fr auto; gap: 4px; text-align: left; }
+#touch-settings-options .value { color: var(--green); }
+#touch-settings-options .btn:active .value { color: var(--dark); }
+body.touch .card .logo { width: 64px; height: 48px; }
+body.touch .card .sub { margin-bottom: 12px; }
+body.touch .card .keys { margin-bottom: 12px; }
+body.touch #kd-community.floating {
+    left: calc(var(--safe-left) + 8px); transform: none;
+    max-width: calc(100% - var(--safe-left) - var(--safe-right) - 272px);
+}
+body.touch #kd-community.floating .kd-session-detail {
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+body.touch.portrait #kd-community.floating {
+    left: max(8px, var(--safe-left)); right: max(8px, var(--safe-right)); margin-inline: auto;
+    max-width: calc(100% - var(--safe-left) - var(--safe-right) - 16px);
+}
+@media (max-height: 480px) and (orientation: landscape) {
+    body.touch .card, #touch-settings { max-width: 680px; }
+    #touch-settings { width: min(560px, calc(100% - var(--safe-left) - var(--safe-right) - 24px)); }
+    #touch-settings-options { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    body.touch .card .keys { grid-template-columns: auto 1fr auto 1fr; gap: 4px 12px; font-size: 13px; }
+}
 </style>
 </head>
-<body>
+<body class="touch-hud-hidden">
 <canvas id="view"></canvas>
 <canvas id="gui"></canvas>
-<input id="tin" type="text" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="send">
+<input id="tin" type="text" autocomplete="off" autocorrect="off" autocapitalize="sentences" spellcheck="false" enterkeyhint="send" aria-label="Chat message or player name">
 
-<div id="touch">
-  <div id="joy" class="ctl"><div id="knob"></div></div>
-  <div id="b-jump" class="ctl btn"><div class="in">JUMP</div></div>
-  <div id="b-dash" class="ctl btn"><div class="in">DASH</div></div>
-  <div id="b-e" class="ctl btn"><div class="in">E<small>use</small></div></div>
-  <div id="b-q" class="ctl btn off"><div class="in">Q<small>gun</small></div></div>
-  <div id="b-next" class="ctl btn sbtn"><div class="in">⇄<small>weapon</small></div></div>
-  <div id="b-f" class="ctl btn sbtn"><div class="in">F<small>shield</small></div></div>
-  <div id="b-h" class="ctl btn sbtn"><div class="in">H<small>heal</small></div></div>
-  <div id="b-g" class="ctl btn sbtn"><div class="in">G<small>nade</small></div></div>
-  <div id="b-map" class="ctl btn sbtn"><div class="in">MAP</div></div>
-  <div id="b-fs" class="ctl btn" title="Fullscreen">⛶</div>
+<div id="touch" class="hidden" aria-label="Game controls">
+  <div id="joy" class="ctl" aria-label="Movement stick"><div id="knob"></div></div>
+  <div id="touch-tools">
+    <button id="b-next" class="ctl btn" type="button" aria-label="Switch weapon"><span class="in">⇄<small>Weapon</small></span></button>
+    <button id="b-q" class="ctl btn off" type="button" aria-label="Holster or draw weapon"><span class="in">Q<small>Holster</small></span></button>
+    <button id="b-f" class="ctl btn" type="button" aria-label="Shield"><span class="in">F<small>Shield</small></span></button>
+    <button id="b-h" class="ctl btn" type="button" aria-label="Heal"><span class="in">H<small>Heal</small></span></button>
+    <button id="b-g" class="ctl btn" type="button" aria-label="Throw grenade"><span class="in">G<small>Nade</small></span></button>
+  </div>
+  <div id="touch-actions">
+    <button id="b-dash" class="ctl btn" type="button">DASH</button>
+    <button id="b-e" class="ctl btn" type="button">USE</button>
+    <button id="b-jump" class="ctl btn" type="button">JUMP</button>
+    <button id="b-fire" class="ctl btn" type="button" aria-label="Fire, drag to aim"><span class="in">FIRE<small>Drag to aim</small></span></button>
+  </div>
 </div>
-<div id="hint">Push the stick all the way to run · turn your phone sideways for a bigger view</div>
+<div id="touch-hud" aria-label="Game menu">
+  <button id="b-discord" class="ctl btn" type="button" aria-label="KD Discord" title="KD Discord">
+    <svg width="21" height="16" viewBox="0 0 21 16" fill="none" aria-hidden="true">
+      <path d="M4 2.5a16 16 0 0 1 13 0c2 3 3 6 3 9.5l-5 2.5-1.3-2H7.3L6 14.5 1 12c0-3.5 1-6.5 3-9.5Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      <circle cx="7" cy="8" r="1.4" fill="currentColor"/><circle cx="14" cy="8" r="1.4" fill="currentColor"/>
+    </svg>
+  </button>
+  <button id="b-chat" class="ctl btn" type="button" aria-label="Chat" title="Chat">
+    <svg width="20" height="20" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+      <path d="M6 14.5 2.5 17V4.5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6Z" stroke="currentColor" stroke-width="1.5" stroke-linejoin="round"/>
+      <path d="M6 8.5h.1m3.9 0h.1m3.9 0h.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+    </svg>
+  </button>
+  <button id="b-settings" class="ctl btn" type="button" aria-label="Settings" title="Settings">⚙</button>
+  <button id="b-map" class="ctl btn" type="button" aria-label="Cycle map">MAP</button>
+  <button id="b-fs" class="ctl btn" type="button" aria-label="Fullscreen" title="Fullscreen">⛶</button>
+</div>
+
+<dialog id="touch-settings" aria-labelledby="touch-settings-title">
+  <header>
+    <h2 id="touch-settings-title">Chat Settings</h2>
+    <button class="btn" type="button" autofocus>Close</button>
+  </header>
+  <label for="touch-player-name">Your name</label>
+  <input id="touch-player-name" maxlength="16" enterkeyhint="done" autocomplete="off">
+  <div id="touch-settings-options">
+    <button class="btn" type="button" data-setting="bubbles">Speech bubbles <span class="value"></span></button>
+    <button class="btn" type="button" data-setting="log">Chat log <span class="value"></span></button>
+    <button class="btn" type="button" data-setting="time">Bubble time <span class="value"></span></button>
+    <button class="btn" type="button" data-setting="npc">NPC replies <span class="value"></span></button>
+    <button class="btn" type="button" data-setting="shader">Shader <span class="value"></span></button>
+    <button class="btn" type="button" data-setting="sfx">Sound volume <span class="value"></span></button>
+    <button class="btn" type="button" data-setting="hum">Lab hum <span class="value"></span></button>
+  </div>
+</dialog>
 
 <a id="dlink" href="#" target="_blank" rel="noopener" hidden>Open the KD Discord channel ↗</a>
 <div id="start">
@@ -103,8 +236,8 @@ body.touch .touch-only { display: contents; }
     </svg>
     <h1>KDlab1</h1>
     <div class="sub">Pick your builder, visit the Showcase Hall, walk the streets of Kuala Lumpur and test 12 weapons in the KD Lab.</div>
-    <div class="keys">
-      <span class="pc-only"><b>A / D  ·  ← →</b><span>Walk  (hold Shift to run)</span>
+    <div class="keys pc-only">
+      <b>A / D  ·  ← →</b><span>Walk  (hold Shift to run)</span>
       <b>Space</b><span>Jump</span>
       <b>W / S  ·  ↑ ↓</b><span>Climb ladders and stairs</span>
       <b>R</b><span>Dash</span>
@@ -114,16 +247,21 @@ body.touch .touch-only { display: contents; }
       <b>F · H · G</b><span>Shield dome · heal · throw a grenade</span>
       <b>M</b><span>Lab map: corner / big / hidden</span>
       <b>T  ·  Enter</b><span>Chat</span>
-      <b>F2</b><span>Change the screen shader</span></span>
-      <span class="touch-only"><b>Stick</b><span>Walk, climb ladders / stairs · push fully to run</span>
-      <b>JUMP · DASH</b><span>Jump and dash</span>
-      <b>E</b><span>Use a station, open a box, go through a door</span>
-      <b>Touch screen</b><span>Aim and shoot · ⇄ switches weapon · Q holsters</span>
-      <b>F · H · G</b><span>Shield dome · heal · grenade</span>
-      <b>Top-right icons</b><span>Discord, chat and settings</span></span>
+      <b>F2</b><span>Change the screen shader</span>
     </div>
     <button id="go" disabled>Loading…</button>
-    <div class="rot touch-only">Tip: landscape gives the biggest view. ⛶ goes fullscreen.</div>
+    <details id="touch-guide">
+      <summary>Touch controls</summary>
+      <div class="keys">
+      <b>Stick</b><span>Walk, climb ladders / stairs · push fully to run</span>
+      <b>JUMP · DASH</b><span>Jump and dash</span>
+      <b>USE</b><span>Use stations, boxes and doors</span>
+      <b>FIRE</b><span>Tap the arena to aim, then FIRE. Drag FIRE to steer.</span>
+      <b>F · H · G</b><span>Shield dome · heal · grenade</span>
+      <b>Game menu</b><span>Discord, chat, settings and map</span>
+      </div>
+    </details>
+    <div class="rot touch-only">Turn your phone sideways for a wider view.</div>
   </div>
 </div>
 
@@ -133,10 +271,41 @@ if ((window.matchMedia && matchMedia('(pointer: coarse)').matches) || ('ontouchs
 window.KD_TOUCH = (() => {
   const $ = id => document.getElementById(id);
   const root = $('touch'), joy = $('joy'), knob = $('knob');
-  const vk = (k, d) => window.KD_GAME && window.KD_GAME.vkey(k, d);
+  const vk = (k, d, cancel) => window.KD_GAME?.vkey(k, d, cancel);
+  const resets = [];
+
+  function bindControl(el, start, move, finish) {
+    let pointer = null;
+    const release = cancelled => {
+      if (pointer === null) return;
+      const id = pointer;
+      pointer = null;
+      if (el.hasPointerCapture(id)) el.releasePointerCapture(id);
+      el.classList.remove('down');
+      finish(cancelled);
+    };
+    el.addEventListener('pointerdown', e => {
+      if (pointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
+      e.preventDefault();
+      pointer = e.pointerId;
+      try { el.setPointerCapture(pointer); } catch {}
+      el.classList.add('down');
+      start(e);
+    });
+    if (move) el.addEventListener('pointermove', e => { if (e.pointerId === pointer) move(e); });
+    el.addEventListener('pointerup', e => { if (e.pointerId === pointer) release(false); });
+    for (const type of ['pointercancel', 'lostpointercapture']) {
+      el.addEventListener(type, e => { if (e.pointerId === pointer) release(true); });
+    }
+    resets.push(() => release(true));
+  }
+
+  function reset() {
+    for (const cancel of resets) cancel();
+  }
   const held = { left: false, right: false, up: false, down: false, shift: false };
   const setHeld = (k, v) => { if (held[k] !== v) { held[k] = v; vk(k, v); } };
-  let joyId = null, jcx = 0, jcy = 0, jr = 60;
+  let jcx = 0, jcy = 0, jr = 60;
 
   function joyMove(x, y) {
     let dx = (x - jcx) / jr, dy = (y - jcy) / jr;
@@ -155,34 +324,34 @@ window.KD_TOUCH = (() => {
     joy.classList.toggle('run', run);
   }
   function joyEnd() {
-    joyId = null;
     knob.style.transform = '';
     for (const k in held) setHeld(k, false);
     joy.classList.remove('run');
   }
-  joy.addEventListener('pointerdown', e => {
-    e.preventDefault();
+  bindControl(joy, e => {
     const r = joy.getBoundingClientRect();
     jcx = r.left + r.width / 2; jcy = r.top + r.height / 2; jr = r.width * 0.4;
-    joyId = e.pointerId;
-    try { joy.setPointerCapture(e.pointerId); } catch (er) {}
     joyMove(e.clientX, e.clientY);
-  });
-  joy.addEventListener('pointermove', e => { if (e.pointerId === joyId) joyMove(e.clientX, e.clientY); });
-  joy.addEventListener('pointerup', e => { if (e.pointerId === joyId) joyEnd(); });
-  joy.addEventListener('pointercancel', e => { if (e.pointerId === joyId) joyEnd(); });
+  }, e => joyMove(e.clientX, e.clientY), joyEnd);
 
   function bindBtn(id, key) {
     const el = $(id);
-    el.addEventListener('pointerdown', e => {
-      e.preventDefault();
-      try { el.setPointerCapture(e.pointerId); } catch (er) {}
-      el.classList.add('down'); vk(key, true);
+    bindControl(el, () => vk(key, true), null, cancelled => vk(key, false, cancelled));
+    el.addEventListener('click', e => {
+      if (e.detail === 0) { vk(key, true); vk(key, false); }
     });
-    const up = () => { el.classList.remove('down'); vk(key, false); };
-    el.addEventListener('pointerup', up);
-    el.addEventListener('pointercancel', up);
   }
+
+  const fire = $('b-fire');
+  let fireX, fireY;
+  bindControl(fire, e => {
+    fireX = e.clientX; fireY = e.clientY;
+    window.KD_GAME?.touchFire(true);
+  }, e => window.KD_GAME?.touchFireAim(e.clientX - fireX, e.clientY - fireY),
+  cancelled => window.KD_GAME?.touchFire(false, cancelled));
+  fire.addEventListener('click', e => {
+    if (e.detail === 0) { window.KD_GAME?.touchFire(true); window.KD_GAME?.touchFire(false); }
+  });
   bindBtn('b-jump', 'space');
   bindBtn('b-dash', 'r');
   bindBtn('b-e', 'e');
@@ -207,58 +376,32 @@ window.KD_TOUCH = (() => {
   });
   if (!(document.documentElement.requestFullscreen || document.documentElement.webkitRequestFullscreen)) $('b-fs').style.display = 'none';
 
-  const place = (id, css) => Object.assign($(id).style, css);
-  function layout(st, portrait) {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const s = Math.max(0.72, Math.min(1.15, Math.min(vw, vh) / 400));
-    const sz = { joy: 150 * s, jump: 84 * s, mid: 64 * s, q: 54 * s };
-    joy.style.width = joy.style.height = sz.joy + 'px';
-    knob.style.width = knob.style.height = 62 * s + 'px';
-    knob.style.margin = `${-31 * s}px 0 0 ${-31 * s}px`;
-    $('b-jump').style.width = $('b-jump').style.height = sz.jump + 'px';
-    for (const id of ['b-e', 'b-dash']) $(id).style.width = $(id).style.height = sz.mid + 'px';
-    $('b-q').style.width = $('b-q').style.height = sz.q + 'px';
-    let pad = 18, bottom;
-    if (portrait) {
-      // controls live in the free space under the game
-      const top = st.y + st.h, area = vh - top;
-      bottom = Math.max(pad, (area - Math.max(sz.joy, sz.jump + sz.mid + 16)) / 2);
-      place('hint', { left: '12px', right: '64px', top: (top + 10) + 'px' });
-      place('b-fs', { left: (vw - 52) + 'px', top: (top + 6) + 'px', bottom: '' });
-    } else {
-      bottom = Math.max(14, vh - (st.y + st.h) + 14);
-      place('b-fs', { left: (st.x + 16) + 'px', top: (st.y + 124) + 'px', bottom: '' });
-    }
-    const side = portrait ? pad : Math.max(pad, st.x + 16);
-    place('joy', { left: side + 'px', bottom: bottom + 'px', top: '' });
-    const r0 = side;
-    place('b-jump', { right: r0 + 'px', bottom: bottom + 'px' });
-    place('b-dash', { right: (r0 + sz.jump + 12) + 'px', bottom: (bottom + 4) + 'px' });
-    place('b-e', { right: (r0 + 10) + 'px', bottom: (bottom + sz.jump + 14) + 'px' });
-    place('b-q', { right: (r0 + sz.jump + 18) + 'px', bottom: (bottom + sz.mid + 22) + 'px' });
-    const sb = 50 * s;
-    for (const id of ['b-next', 'b-f', 'b-h', 'b-g', 'b-map']) $(id).style.width = $(id).style.height = sb + 'px';
-    place('b-next', { right: (r0 + sz.jump + sz.q + 26) + 'px', bottom: (bottom + sz.mid + 24) + 'px' });
-    const ry = bottom + sz.jump + sz.mid + 26;
-    place('b-g', { right: r0 + 'px', bottom: ry + 'px' });
-    place('b-h', { right: (r0 + sb + 10) + 'px', bottom: ry + 'px' });
-    place('b-f', { right: (r0 + 2 * (sb + 10)) + 'px', bottom: ry + 'px' });
-    place('b-map', { left: side + 'px', bottom: (bottom + sz.joy + 14) + 'px', top: '' });
+  function layout(st) {
+    document.body.style.setProperty('--stage-bottom', (st.y + st.h) + 'px');
   }
   let lastBlock = null, lastGun = null;
   function update(uiBlock, hasGun) {
-    if (uiBlock !== lastBlock) { root.classList.toggle('hidden', uiBlock); lastBlock = uiBlock; if (uiBlock) joyEnd(); }
+    if (uiBlock !== lastBlock) {
+      root.classList.toggle('hidden', uiBlock);
+      document.body.classList.toggle('touch-hud-hidden', uiBlock);
+      lastBlock = uiBlock;
+      if (uiBlock) reset();
+    }
     if (hasGun !== lastGun) { $('b-q').classList.toggle('off', !hasGun); lastGun = hasGun; }
   }
-  return { layout, update };
+  return { layout, update, reset };
 })();
+
+for (const action of ['discord', 'chat', 'settings']) {
+  document.getElementById('b-' + action).addEventListener('click', () => window.KD_GAME?.hudAction(action));
+}
 
 /* ---------------- start screen ---------------- */
 window.KD_READY = () => {
   const go = document.getElementById('go');
   go.disabled = false;
   go.textContent = (window.KD_GAME && window.KD_GAME.IS_TOUCH) ? 'Tap to start' : 'Click to start';
-  go.focus();
+  if (!document.body.classList.contains('touch')) go.focus({ preventScroll: true });
   const begin = e => {
     if (e) e.preventDefault();
     document.getElementById('start').classList.add('gone');
@@ -320,7 +463,7 @@ const guiCv = $('gui');            // 2D HUD / menus
 const tin = $('tin');              // text input (chat / name)
 const GX = guiCv.getContext('2d');
 const gameCv = document.createElement('canvas');   // world is drawn here first
-const WX = gameCv.getContext('2d');
+const WX = gameCv.getContext('2d', { alpha: false });
 
 const GUI_W = 1280, GUI_H = 720;
 let VIEW_W = 320, VIEW_H = 180;     // the camera size changes per room (Showcase Hall = 640 x 360)
@@ -572,10 +715,11 @@ function humGainUpdate() { if (AU.humGain) AU.humGain.gain.value = 0.35 * GL_.sf
 // =====================================================================
 // input
 // =====================================================================
-const K = { down: new Set(), pressed: new Set() };
-const kd = k => K.down.has(k);
+const K = { down: new Set(), touch: new Set(), pressed: new Set() };
+const kd = k => K.down.has(k) || K.touch.has(k);
 const kp = k => K.pressed.has(k);
-const M = { x: 760, y: 360, down: false, pressed: false, touchAim: false, wheel: 0, overButton: false };
+const M = { x: 760, y: 360, down: false, pressed: false, wheel: 0, overButton: false,
+    source: IS_TOUCH ? 'touch' : 'mouse', touchAim: false, aimX: null, aimY: 0, touchFireDown: false, touchFireTap: false };
 function keyName(e) {
     const c = e.code || '';
     if (c.startsWith('Key')) return c.slice(3).toLowerCase();
@@ -598,53 +742,111 @@ function keyName(e) {
     if (e.key === 'Escape') return 'escape';
     return null;
 }
-function vkey(k, down) {
-    if (down) { if (!K.down.has(k)) K.pressed.add(k); K.down.add(k); }
-    else K.down.delete(k);
+function setKey(keys, k, down) {
+    if (down) {
+        if (!kd(k)) K.pressed.add(k);
+        keys.add(k);
+    } else keys.delete(k);
+}
+function vkey(k, down, cancelled = false) {
+    if (down) M.source = 'touch';
+    setKey(K.touch, k, down);
+    if (cancelled && !K.down.has(k)) K.pressed.delete(k);
 }
 window.addEventListener('keydown', e => {
     if (e.target === tin) return;
+    if ((e.key === 'Enter' || e.key === ' ') && e.target.closest?.('#touch button, #touch-hud button')) return;
     audioUnlock();
     const k = keyName(e);
     if (!k) return;
     if (['left', 'right', 'up', 'down', 'space', 'f2', 'enter'].includes(k)) e.preventDefault();
-    if (!e.repeat) vkey(k, true);
+    if (!e.repeat) setKey(K.down, k, true);
 });
 window.addEventListener('keyup', e => { const k = keyName(e); if (k) K.down.delete(k); });
-window.addEventListener('blur', () => { K.down.clear(); M.down = false; });
 
 function toGui(cx, cy) {
     const r = guiCv.getBoundingClientRect();
     return [(cx - r.left) / r.width * GUI_W, (cy - r.top) / r.height * GUI_H];
 }
-let aimPointer = null;
+let canvasPointer = null, touchCanvas = false;
+function clearCanvasPointer(cancelled) {
+    const id = canvasPointer;
+    canvasPointer = null;
+    touchCanvas = M.down = M.touchAim = false;
+    if (cancelled) M.pressed = false;
+    if (id !== null && guiCv.hasPointerCapture(id)) guiCv.releasePointerCapture(id);
+}
+function resetTouchInput() {
+    window.KD_TOUCH?.reset();
+    K.touch.clear();
+    M.touchFireDown = M.touchFireTap = false;
+    if (touchCanvas || M.source === 'touch') clearCanvasPointer(true);
+}
+function resetInput() {
+    resetTouchInput();
+    clearCanvasPointer(true);
+    K.down.clear();
+    K.pressed.clear();
+    M.wheel = 0;
+}
+window.addEventListener('blur', resetInput);
+window.addEventListener('orientationchange', resetTouchInput);
+document.addEventListener('visibilitychange', () => { if (document.hidden) resetInput(); });
+
+function touchFire(down, cancelled = false) {
+    const gun = R?.player?.gun;
+    if (down) {
+        if (!gun || GL_.ui_block) return;
+        audioUnlock();
+        M.source = 'touch';
+        M.touchFireDown = true;
+        if (gun.weapon.auto) M.touchFireTap = true;
+    } else {
+        if (cancelled) M.touchFireTap = false;
+        else if (M.touchFireDown && gun && !gun.weapon.auto) M.touchFireTap = true;
+        M.touchFireDown = false;
+    }
+}
+function touchFireAim(dx, dy) {
+    const distance = Math.hypot(dx, dy);
+    if (!M.touchFireDown || M.touchAim || distance < 8) return;
+    const scale = clamp(distance * 2, 70, 140) / distance;
+    M.aimX = dx * scale;
+    M.aimY = dy * scale;
+}
 guiCv.addEventListener('pointerdown', e => {
+    if (canvasPointer !== null || (e.pointerType === 'mouse' && e.button !== 0)) return;
     e.preventDefault();
     audioUnlock();
     const [x, y] = toGui(e.clientX, e.clientY);
-    // a tap outside the text box closes it (the canvas never takes focus)
+    // A tap outside the text box closes it (the canvas never takes focus).
     if (textKind && !(textKind === 'chat' && inR(x, y, 16, 720 - 64, 660, 720 - 16))) textCancel();
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    canvasPointer = e.pointerId;
+    touchCanvas = IS_TOUCH && e.pointerType !== 'mouse';
+    M.source = touchCanvas ? 'touch' : 'mouse';
     M.x = x; M.y = y;
     M.down = true; M.pressed = true;
-    if (e.pointerType !== 'mouse') { aimPointer = e.pointerId; M.touchAim = true; }
-    try { guiCv.setPointerCapture(e.pointerId); } catch (er) {}
+    M.touchAim = touchCanvas && !!R.player && !GL_.ui_block && !textKind;
+    if (M.touchAim) rememberCanvasAim(R.player);
+    try { guiCv.setPointerCapture(e.pointerId); } catch {}
     G.preFocus(x, y);       // mobile keyboards only open from inside a tap
 });
 guiCv.addEventListener('pointermove', e => {
-    if (e.pointerType !== 'mouse' && e.pointerId !== aimPointer) return;
-    const [x, y] = toGui(e.clientX, e.clientY);
-    M.x = x; M.y = y;
+    if (e.pointerType === 'mouse') {
+        if (touchCanvas || M.touchFireDown) return;
+        M.source = 'mouse';
+    } else if (e.pointerId !== canvasPointer || (touchCanvas && !M.touchAim)) return;
+    [M.x, M.y] = toGui(e.clientX, e.clientY);
+    if (M.touchAim) rememberCanvasAim(R.player);
 });
-const pUp = e => {
-    if (e.pointerType !== 'mouse' && e.pointerId !== aimPointer) return;
-    M.down = false;
-    if (e.pointerType !== 'mouse') { aimPointer = null; M.touchAim = false; }
+guiCv.addEventListener('pointerup', e => {
+    if (e.pointerId !== canvasPointer || (e.pointerType === 'mouse' && e.button !== 0)) return;
+    clearCanvasPointer(false);
     if (textKind && document.activeElement !== tin) tin.focus();
-    
-};
-guiCv.addEventListener('pointerup', pUp);
-guiCv.addEventListener('pointercancel', pUp);
+});
+for (const type of ['pointercancel', 'lostpointercapture']) {
+    guiCv.addEventListener(type, e => { if (e.pointerId === canvasPointer) clearCanvasPointer(true); });
+}
 guiCv.addEventListener('contextmenu', e => e.preventDefault());
 guiCv.addEventListener('wheel', e => { e.preventDefault(); if (e.deltaY) M.wheel += Math.sign(e.deltaY); }, { passive: false });
 
@@ -680,11 +882,11 @@ function placeTextInput() {
     const s = stageRect.w / GUI_W;
     let r;
     if (IS_TOUCH) {
-        // phones: a visible box at the top so the on-screen keyboard never hides it
+        // Keep the input at the top when the phone keyboard opens.
         tin.classList.add('vis');
-        tin.style.left = '8px';
-        tin.style.top = (Math.max(8, stageRect.y + 8)) + 'px';
-        tin.style.width = (window.innerWidth - 16) + 'px';
+        tin.style.left = 'calc(var(--safe-left) + 8px)';
+        tin.style.top = 'calc(var(--safe-top) + 8px)';
+        tin.style.width = 'calc(100% - var(--safe-left) - var(--safe-right) - 16px)';
         tin.style.height = '44px';
         tin.style.fontSize = '16px';
         tin.placeholder = textKind === 'name' ? 'Your name' : 'Say something...';
@@ -1058,6 +1260,12 @@ function cameraFollow() {
 }
 const mouseRoomX = () => cam.x + M.x * VIEW_W / GUI_W;
 const mouseRoomY = () => cam.y + M.y * VIEW_H / GUI_H;
+const aimRoomX = p => M.source === 'touch' && !M.touchAim ? p.x + (M.aimX ?? p.facing * 70) : mouseRoomX();
+const aimRoomY = p => M.source === 'touch' && !M.touchAim ? p.y + AIM_Y + M.aimY : mouseRoomY();
+function rememberCanvasAim(p) {
+    M.aimX = mouseRoomX() - p.x;
+    M.aimY = mouseRoomY() - (p.y + AIM_Y);
+}
 
 // =====================================================================
 // objects
@@ -1263,13 +1471,10 @@ function playerStep(p) {
 
     p.x = clamp(p.x, 8, R.w - 8);
 
-    // touch: with no finger aiming, the gun points where you walk
-    if (IS_TOUCH && p.gun && !M.touchAim && h !== 0) {
-        M.x = (p.x + h * 70 - cam.x) * GUI_W / VIEW_W;
-        M.y = (p.y - 11 - cam.y) * GUI_H / VIEW_H;
-    }
+    // Before aiming manually, touch players aim in their walking direction.
+    if (M.source === 'touch' && M.aimX === null && h !== 0 && !blocked) p.facing = h;
     if (p.gun && p.gun.visible && p.mode !== 'ladder') {
-        const mx = mouseRoomX();
+        const mx = aimRoomX(p);
         if (mx > p.x + 1) p.facing = 1; else if (mx < p.x - 1) p.facing = -1;
     }
 
@@ -1520,19 +1725,32 @@ const G = {
     shader_names: ['Off', 'Clean', 'CRT', 'Neon'],
 
     init() {
-        kdChatAdd('KD', IS_TOUCH ? 'Welcome to the KrackedDevs lab! Tap the chat bubble to chat, E to interact.'
+        kdChatAdd('KD', IS_TOUCH ? 'Welcome to the KrackedDevs lab! Tap the chat bubble to chat, USE to interact.'
                                  : 'Welcome to the KrackedDevs lab! Press T to chat, E to interact.', rgb(80, 230, 120));
     },
     roomStart() {
         this.near_station = null; this.near_gun = null; this.panel_open = false; this.select_open = false; this.pending = [];
         kdAmbienceUpdate();
     },
-    // mobile: open the keyboard from inside the tap itself
+    activateHUD(action) {
+        if (action === 'chat') {
+            if (this.blockClickUntilRelease) return;
+            this.chat_typing = true;
+            this.chat_text = '';
+            textOpen('chat', '', 60);
+            kdSfx('snd_ui_click');
+        } else if (action === 'settings') {
+            this.settings_open = true;
+            kdSfx('snd_ui_open');
+        } else if (action === 'discord') {
+            kdSfx('snd_confirm');
+            kdToast('Opening the KD Discord channel...', rgb(150, 160, 255));
+            discordOpen();
+        }
+    },
+    // Mobile keyboards open only while the tap is being handled.
     preFocus(x, y) {
-        if (!IS_TOUCH) return;
-        const busy = this.chat_typing || this.name_editing || this.settings_open || this.panel_open || this.select_open;
-        if (!busy && inB(x, y, this.chat_btn)) { textOpen('chat', '', 60); this.chat_typing = true; this.chat_text = ''; this.preOpened = true; }
-        else if (this.settings_open && !this.name_editing) {
+        if (IS_TOUCH && this.settings_open && !this.name_editing) {
             const bx1 = this.set_x1 + this.set_w - 190, by1 = this.set_y1 + 76;
             if (!presence?.user && inR(x, y, bx1, by1, bx1 + 160, by1 + 34)) { textOpen('name', GL_.name, 16); this.name_editing = true; this.chat_text = GL_.name; this.preOpened = true; }
         }
@@ -1573,7 +1791,7 @@ const G = {
         const wasBlocked = GL_.ui_block;
         this.blink += 1;
         this.select_t += 1;
-        M.overButton = inR(mx, my, this.discord_btn[0], this.discord_btn[1], this.gear_btn[2], this.gear_btn[3]);
+        M.overButton = !IS_TOUCH && inR(mx, my, this.discord_btn[0], this.discord_btn[1], this.gear_btn[2], this.gear_btn[3]);
         GL_.mouse_over_ui = M.overButton || !!showcaseHovered();     // showcase links are clickable
         if (kp('m') && !this.chat_typing && !this.name_editing) { GL_.minimap = (GL_.minimap + 1) % 3; kdSfx('snd_ui_click'); }
         if (GL_.shake > 0) { GL_.shake = Math.max(0, GL_.shake - 0.6); const a = GL_.shake; cam.sx = Math.round(rr(-a, a)); cam.sy = Math.round(rr(-a, a)); }
@@ -1623,28 +1841,12 @@ const G = {
                     const bx1 = this.set_x1 + this.set_w - 190, by1 = this.set_y1 + 76 + r * 46;
                     if (inR(mx, my, bx1, by1, bx1 + 160, by1 + 34)) {
                         kdSfx('snd_ui_click');
-                        switch (this.set_rows[r]) {
-                            case 'name':
-                                if (presence?.user) { kdToast('Your name is provided by Discord.', rgb(150, 200, 255)); break; }
-                                this.name_editing = true; this.chat_text = GL_.name; textOpen('name', GL_.name, 16); break;
-                            case 'bubbles': GL_.show_bubbles = !GL_.show_bubbles; break;
-                            case 'log': GL_.show_log = !GL_.show_log; break;
-                            case 'time': GL_.bubble_time = GL_.bubble_time === 3 ? 5 : GL_.bubble_time === 5 ? 8 : 3; break;
-                            case 'npc': GL_.npc_replies = !GL_.npc_replies; break;
-                            case 'shader': GL_.shader = (GL_.shader + 1) % 4; break;
-                            case 'sfx':
-                                GL_.sfx_vol -= 0.25;
-                                if (GL_.sfx_vol < 0) GL_.sfx_vol = 1;
-                                humGainUpdate(); kdAmbienceUpdate();
-                                break;
-                            case 'hum': GL_.hum_on = !GL_.hum_on; kdAmbienceUpdate(); break;
-                            case 'close': this.settings_open = false; break;
-                        }
+                        this.changeSetting(this.set_rows[r]);
                     }
                 }
-                if (inB(mx, my, this.gear_btn)) this.settings_open = false;
+                if (!IS_TOUCH && inB(mx, my, this.gear_btn)) this.settings_open = false;
                 // tap outside the panel closes it (handy on touch screens)
-                if (!inR(mx, my, this.set_x1, this.set_y1, this.set_x1 + this.set_w, this.set_y1 + this.set_h) && !inB(mx, my, this.gear_btn)) {
+                if (!inR(mx, my, this.set_x1, this.set_y1, this.set_x1 + this.set_w, this.set_y1 + this.set_h) && (IS_TOUCH || !inB(mx, my, this.gear_btn))) {
                     this.settings_open = false; kdSfx('snd_ui_close');
                 }
             }
@@ -1715,18 +1917,11 @@ const G = {
                 kdSfx('snd_ui_close');
             }
         } else {
-            if ((kp('t') || kp('enter') || (click && inB(mx, my, this.chat_btn))) && !this.blockClickUntilRelease) {
-                this.chat_typing = true;
-                this.chat_text = '';
-                textOpen('chat', '', 60);
-                kdSfx('snd_ui_click');
-            } else if (click && inB(mx, my, this.gear_btn)) {
-                this.settings_open = true;
-                kdSfx('snd_ui_open');
-            } else if (click && inB(mx, my, this.discord_btn)) {
-                kdSfx('snd_confirm');
-                kdToast('Opening the KD Discord channel...', rgb(150, 160, 255));
-                discordOpen();
+            if (kp('t') || kp('enter')) this.activateHUD('chat');
+            else if (click && !IS_TOUCH) {
+                if (inB(mx, my, this.chat_btn)) this.activateHUD('chat');
+                else if (inB(mx, my, this.gear_btn)) this.activateHUD('settings');
+                else if (inB(mx, my, this.discord_btn)) this.activateHUD('discord');
             }
 
             this.near_station = null;
@@ -1741,7 +1936,7 @@ const G = {
                 kdSfx('snd_pickup', 0.02);
                 this.near_gun.dead = true;
                 this.near_gun = null;
-                kdToast('Equipped: ' + WEAPONS[wk].name + (IS_TOUCH ? '   (touch the screen to aim + shoot, Q to holster)' : '   (aim with the mouse, LEFT CLICK to shoot, Q to holster)'), WHITE);
+                kdToast('Equipped: ' + WEAPONS[wk].name + (IS_TOUCH ? '   (tap to aim, use FIRE to shoot)' : '   (aim with the mouse, LEFT CLICK to shoot, Q to holster)'), WHITE);
             } else if (!this.chat_typing && this.near_station && kp('e') && (this.near_station.station === 'select' || isDoor(this.near_station.station))) {
                 const s = this.near_station.station;
                 this.near_station.visited = true;
@@ -1758,6 +1953,7 @@ const G = {
         if (!M.down) this.blockClickUntilRelease = false;
 
         GL_.ui_block = this.chat_typing || this.name_editing || this.settings_open || this.panel_open || this.select_open;
+        if (IS_TOUCH && this.settings_open) showTouchSettings();
         if (wasBlocked && M.down) GL_.ui_block = true;
         guiCv.style.cursor = (!GL_.ui_block && !IS_TOUCH) ? 'none' : 'default';
     },
@@ -1795,42 +1991,44 @@ const G = {
 
         drawPlayerHud();
 
-        // corner buttons
-        const cb = this.chat_btn, gb = this.gear_btn, db = this.discord_btn;
-        const hc = hov(cb) || this.chat_typing, hg = hov(gb) || this.settings_open;
-        setA(0.85); setC(DARK);
-        rrect(cb[0], cb[1], cb[2], cb[3], 10, false);
-        rrect(gb[0], gb[1], gb[2], gb[3], 10, false);
-        setA(1);
-        const cx = (cb[0] + cb[2]) / 2, cy = (cb[1] + cb[3]) / 2;
-        setC(hc ? GREEN : WHITE);
-        rrect(cb[0], cb[1], cb[2], cb[3], 10, true);
-        rrect(cx - 14, cy - 11, cx + 14, cy + 7, 8, false);
-        tri(cx - 8, cy + 5, cx - 1, cy + 5, cx - 10, cy + 13);
-        setC(DARK); circle(cx - 7, cy - 2, 2); circle(cx, cy - 2, 2); circle(cx + 7, cy - 2, 2);
-        const gx = (gb[0] + gb[2]) / 2, gy = (gb[1] + gb[3]) / 2;
-        setC(hg ? GREEN : WHITE);
-        rrect(gb[0], gb[1], gb[2], gb[3], 10, true);
-        for (let a = 0; a < 360; a += 45) { ctx.lineCap = 'butt'; line(gx, gy, gx + ldx(13, a), gy + ldy(13, a), 6); }
-        circle(gx, gy, 10);
-        setC(DARK); circle(gx, gy, 4);
+        if (!IS_TOUCH) {
+            // corner buttons
+            const cb = this.chat_btn, gb = this.gear_btn, db = this.discord_btn;
+            const hc = hov(cb) || this.chat_typing, hg = hov(gb) || this.settings_open;
+            setA(0.85); setC(DARK);
+            rrect(cb[0], cb[1], cb[2], cb[3], 10, false);
+            rrect(gb[0], gb[1], gb[2], gb[3], 10, false);
+            setA(1);
+            const cx = (cb[0] + cb[2]) / 2, cy = (cb[1] + cb[3]) / 2;
+            setC(hc ? GREEN : WHITE);
+            rrect(cb[0], cb[1], cb[2], cb[3], 10, true);
+            rrect(cx - 14, cy - 11, cx + 14, cy + 7, 8, false);
+            tri(cx - 8, cy + 5, cx - 1, cy + 5, cx - 10, cy + 13);
+            setC(DARK); circle(cx - 7, cy - 2, 2); circle(cx, cy - 2, 2); circle(cx + 7, cy - 2, 2);
+            const gx = (gb[0] + gb[2]) / 2, gy = (gb[1] + gb[3]) / 2;
+            setC(hg ? GREEN : WHITE);
+            rrect(gb[0], gb[1], gb[2], gb[3], 10, true);
+            for (let a = 0; a < 360; a += 45) { ctx.lineCap = 'butt'; line(gx, gy, gx + ldx(13, a), gy + ldy(13, a), 6); }
+            circle(gx, gy, 10);
+            setC(DARK); circle(gx, gy, 4);
 
-        const dc = (db[0] + db[2]) / 2, dcy = (db[1] + db[3]) / 2;
-        const hd = hov(db);
-        const BLURPLE = rgb(88, 101, 242);
-        setA(0.85); setC(DARK); rrect(db[0], db[1], db[2], db[3], 10, false);
-        setA(1); setC(hd ? BLURPLE : WHITE); rrect(db[0], db[1], db[2], db[3], 10, true);
-        setC(hd ? WHITE : BLURPLE);
-        rrect(dc - 14, dcy - 10, dc + 14, dcy + 10, 9, false);
-        tri(dc - 14, dcy + 2, dc - 8, dcy + 10, dc - 16, dcy + 12);
-        tri(dc + 14, dcy + 2, dc + 8, dcy + 10, dc + 16, dcy + 12);
-        setC(DARK);
-        ellipse(dc - 8, dcy - 3, dc - 3, dcy + 3); ellipse(dc + 3, dcy - 3, dc + 8, dcy + 3);
-        setC(GREY); halign = 'center';
-        if (hd) txt(dc, 66, 'KD Discord');
-        if (hov(cb)) txt(cx, 66, 'Chat (T)');
-        if (hov(gb)) { halign = 'right'; txt(1274, 66, 'Chat settings'); halign = 'center'; }
-        halign = 'left';
+            const dc = (db[0] + db[2]) / 2, dcy = (db[1] + db[3]) / 2;
+            const hd = hov(db);
+            const BLURPLE = rgb(88, 101, 242);
+            setA(0.85); setC(DARK); rrect(db[0], db[1], db[2], db[3], 10, false);
+            setA(1); setC(hd ? BLURPLE : WHITE); rrect(db[0], db[1], db[2], db[3], 10, true);
+            setC(hd ? WHITE : BLURPLE);
+            rrect(dc - 14, dcy - 10, dc + 14, dcy + 10, 9, false);
+            tri(dc - 14, dcy + 2, dc - 8, dcy + 10, dc - 16, dcy + 12);
+            tri(dc + 14, dcy + 2, dc + 8, dcy + 10, dc + 16, dcy + 12);
+            setC(DARK);
+            ellipse(dc - 8, dcy - 3, dc - 3, dcy + 3); ellipse(dc + 3, dcy - 3, dc + 8, dcy + 3);
+            setC(GREY); halign = 'center';
+            if (hd) txt(dc, 66, 'KD Discord');
+            if (hov(cb)) txt(cx, 66, 'Chat (T)');
+            if (hov(gb)) { halign = 'right'; txt(1274, 66, 'Chat settings'); halign = 'center'; }
+            halign = 'left';
+        }
 
         // chat log
         let la = 0;
@@ -1880,29 +2078,20 @@ const G = {
             setC(WHITE); txt(px1 + 50, 610, prompt, 1.3);
         }
 
-        // Desktop: map under the corner controls, then the weapon grid.
+        // Keep the corner map clear of the touch controls and the desktop weapon grid below it.
         if (!this.select_open) {
-            if (!IS_TOUCH) {
-                let weaponTop = 100;
-                if (GL_.minimap === 1) {
-                    const mapHeight = R.h * Math.min(240 / R.w, 130 / R.h);
-                    const mapBottom = 80 + 32 + mapHeight;
-                    minimapDraw(1280 - 24, mapBottom, 240, 130, false);
-                    weaponTop = mapBottom + 40;
-                }
-                drawWeaponBar(weaponTop + 76);
-            } else {
-                let barY2 = 720 - 16;
-                if (GL_.minimap === 1) barY2 = minimapDraw(1280 - 24, 720 - 24, 240, 130, false) - 8;
-                if (GL_.minimap !== 1) drawWeaponBar(barY2);
-            }
+            const mapHeight = R.h * Math.min(240 / R.w, 130 / R.h);
+            const mapBottom = (IS_TOUCH ? 48 : 112) + mapHeight;
+            if (GL_.minimap === 1) minimapDraw(1280 - 24, mapBottom, 240, 130, false);
+            if (!IS_TOUCH) drawWeaponBar((GL_.minimap === 1 ? mapBottom + 40 : 100) + 76);
+            else if (GL_.minimap !== 1) drawWeaponBar(720 - 16);
             if (GL_.minimap === 2) minimapDraw(0, 0, 900, 440, true);
         }
         for (const s of R.show) showcaseGui(s);
 
         if (this.panel_open && this.panel && this.panel.feed && this.feed_events.length > 0) this.drawFeed(mx, my, hov);
         else if (this.panel_open && this.panel) this.drawPanel();
-        if (this.settings_open) this.drawSettings(mx, my, hov);
+        if (this.settings_open && !IS_TOUCH) this.drawSettings(mx, my, hov);
         if (this.select_open && this.cz_look) this.drawCustomiser(mx, my, hov);
 
         // toasts
@@ -1921,19 +2110,26 @@ const G = {
             let r = 9, armed = false, kick = 0;
             const g = R.player && R.player.gun;
             if (g && g.visible) { armed = true; kick = g.recoil; }
-            if (!(IS_TOUCH && !armed)) {
-                r += kick * 1.5;
-                LW = 1.5;
+            const touch = M.source === 'touch';
+            if (!touch || armed) {
+                const unit = touch ? Math.max(1, GUI_W / stageRect.w / 2) : 1;
+                r = (r + kick * 1.5) * unit;
+                const pad = r + 6 * unit;
+                const x = touch ? clamp((aimRoomX(R.player) - cam.x) * GUI_W / VIEW_W, pad, GUI_W - pad) : mx;
+                const y = touch ? clamp((aimRoomY(R.player) - cam.y) * GUI_H / VIEW_H, pad, GUI_H - pad) : my;
+                LW = 1.5 * unit;
                 setC(rgb(16, 20, 26)); setA(0.7);
-                circle(mx, my, r + 1, true); circle(mx, my, r - 1, true);
-                setA(1); setC(GL_.mouse_over_ui ? GREY : WHITE);
-                circle(mx, my, r, true);
+                circle(x, y, r + unit, true); circle(x, y, r - unit, true);
+                setA(1); setC(!touch && GL_.mouse_over_ui ? GREY : WHITE);
+                circle(x, y, r, true);
                 if (armed) {
                     ctx.lineCap = 'butt';
-                    line(mx - r - 5, my, mx - r + 2, my, 2); line(mx + r - 2, my, mx + r + 5, my, 2);
-                    line(mx, my - r - 5, mx, my - r + 2, 2); line(mx, my + r - 2, mx, my + r + 5, 2);
-                    setC(GREEN); circle(mx, my, 2);
-                } else circle(mx, my, 1);
+                    line(x - r - 5 * unit, y, x - r + 2 * unit, y, 2 * unit);
+                    line(x + r - 2 * unit, y, x + r + 5 * unit, y, 2 * unit);
+                    line(x, y - r - 5 * unit, x, y - r + 2 * unit, 2 * unit);
+                    line(x, y + r - 2 * unit, x, y + r + 5 * unit, 2 * unit);
+                    setC(GREEN); circle(x, y, 2 * unit);
+                } else circle(x, y, 1);
                 setC(WHITE);
             }
         }
@@ -2030,6 +2226,26 @@ const G = {
         setC(GREY); halign = 'right';
         txt(x2 - 24, y2 - 34, IS_TOUCH ? (pn.discord ? 'tap outside = close' : 'tap to close') : '[E] / [Esc] / click to close');
         halign = 'left';
+    },
+
+    changeSetting(key) {
+        switch (key) {
+            case 'name':
+                if (presence?.user) { kdToast('Your name is provided by Discord.', rgb(150, 200, 255)); break; }
+                this.name_editing = true; this.chat_text = GL_.name; textOpen('name', GL_.name, 16); break;
+            case 'bubbles': GL_.show_bubbles = !GL_.show_bubbles; break;
+            case 'log': GL_.show_log = !GL_.show_log; break;
+            case 'time': GL_.bubble_time = GL_.bubble_time === 3 ? 5 : GL_.bubble_time === 5 ? 8 : 3; break;
+            case 'npc': GL_.npc_replies = !GL_.npc_replies; break;
+            case 'shader': GL_.shader = (GL_.shader + 1) % 4; break;
+            case 'sfx':
+                GL_.sfx_vol -= 0.25;
+                if (GL_.sfx_vol < 0) GL_.sfx_vol = 1;
+                humGainUpdate(); kdAmbienceUpdate();
+                break;
+            case 'hum': GL_.hum_on = !GL_.hum_on; kdAmbienceUpdate(); break;
+            case 'close': this.settings_open = false; break;
+        }
     },
 
     drawSettings(mx, my, hov) {
@@ -2151,6 +2367,60 @@ const G = {
                                : 'W/S = choose row    A/D = change    click swatches / arrows / presets    Esc = cancel');
     }
 };
+
+const touchSettings = $('touch-settings');
+const touchName = $('touch-player-name');
+const touchNameLabel = touchSettings.querySelector('label');
+const touchOptions = touchSettings.querySelectorAll('[data-setting]');
+
+function refreshTouchName() {
+    touchName.readOnly = !!presence?.user;
+    touchNameLabel.textContent = touchName.readOnly ? 'Discord name' : 'Your name';
+    touchName.value = GL_.name;
+}
+function refreshTouchSettings() {
+    const onOff = value => value ? 'On' : 'Off';
+    const values = {
+        bubbles: onOff(GL_.show_bubbles), log: onOff(GL_.show_log), time: GL_.bubble_time + ' s',
+        npc: onOff(GL_.npc_replies), shader: G.shader_names[GL_.shader],
+        sfx: Math.round(GL_.sfx_vol * 100) + '%', hum: onOff(GL_.hum_on)
+    };
+    for (const button of touchOptions) button.querySelector('.value').textContent = values[button.dataset.setting];
+}
+function showTouchSettings() {
+    if (touchSettings.open) return;
+    refreshTouchName();
+    refreshTouchSettings();
+    touchSettings.showModal();
+}
+if (IS_TOUCH) {
+    touchSettings.querySelector('header button').addEventListener('click', () => touchSettings.close());
+    touchSettings.addEventListener('close', () => {
+        G.settings_open = false;
+        kdSfx('snd_ui_close');
+        requestAnimationFrame(() => $('b-settings').focus({ preventScroll: true }));
+    });
+    touchSettings.addEventListener('keydown', event => {
+        event.stopPropagation();
+        if (event.target === touchName && event.key === 'Enter' && !event.isComposing) {
+            event.preventDefault();
+            touchName.blur();
+        }
+    });
+    touchSettings.addEventListener('keyup', event => event.stopPropagation());
+    touchName.addEventListener('change', () => {
+        G.textSubmitted('name', touchName.value);
+        refreshTouchName();
+    });
+    for (const button of touchOptions) {
+        button.addEventListener('click', () => {
+            G.changeSetting(button.dataset.setting);
+            kdSfx('snd_ui_click');
+            refreshTouchSettings();
+        });
+    }
+}
+
 
 function drawBubble(wx, wy, text, alpha) {
     const s = GUI_W / VIEW_W;
@@ -2552,7 +2822,7 @@ function gunEndStep(g) {
     const melee = w.type === 'melee';
     const sx = o.x + o.facing * AIM_X;
     const sy = o.y + AIM_Y + o.draw_bob - o.recoil_lift;
-    g.aim_dir = pdir(sx, sy, mouseRoomX(), mouseRoomY());
+    g.aim_dir = pdir(sx, sy, aimRoomX(o), aimRoomY(o));
     if (!melee && o.mode === 'normal' && o.on_ground && g.aim_dir > 220 && g.aim_dir < 320) g.aim_dir = g.aim_dir < 270 ? 220 : 320;
     g.recoil = Math.max(0, g.recoil - 0.5);
     g.cooldown = Math.max(0, g.cooldown - 1);
@@ -2577,8 +2847,9 @@ function gunEndStep(g) {
         g.kick_ang = Math.max(0, g.kick_ang - 1.5);
         g.image_angle = g.aim_dir + g.kick_ang * g.image_yscale;
     }
-    const fire = w.auto ? M.down : M.pressed;
-    const can = g.visible && !GL_.ui_block && !GL_.mouse_over_ui;
+    const touch = M.source === 'touch';
+    const fire = touch ? M.touchFireTap || (w.auto && M.touchFireDown) : (w.auto ? M.down : M.pressed);
+    const can = g.visible && !GL_.ui_block && (touch || !GL_.mouse_over_ui);
     if (can && fire && g.cooldown === 0 && g.burst_left === 0) {
         switch (w.type) {
             case 'melee':
@@ -3832,6 +4103,8 @@ function stationName(id) {
 // ---------------- rooms ----------------
 function roomGoto(name) {
     liveHitEffects.clear();
+    if (IS_TOUCH) resetTouchInput();
+    M.aimX = null; M.aimY = 0;
     const def = window.KD_ROOMS[name];
     R = { name, w: def.w, h: def.h, bg: def.bg, solids: [], ladders: [], stairs: [], stations: [], npcs: [], guns: [], bullets: [], sparks: [], fx: [],
           decor: [], lineup: null, player: null, kfx: [], vfx: [], boxes: [], items: [], fog: [], show: [], kl: false, title: null };
@@ -3908,6 +4181,12 @@ function nameplate(wx, wy, name, look, hp, hpMax, col, ko, showHealth = true) {
 function drawPlayerHud() {
     const p = R.player;
     if (!p) return;
+    // Keep text legible in a phone's smaller CSS viewport.
+    ctx.save();
+    if (IS_TOUCH) {
+        const scale = Math.max(1, 768 / stageRect.w);
+        ctx.scale(scale, scale);
+    }
     const lvl = levelFromExp(GL_.exp), cur = expForLevel(lvl), next = expForLevel(lvl + 1);
     const xp = clamp((GL_.exp - cur) / (next - cur), 0, 1);
     const hp = clamp(p.hp / p.hp_max, 0, 1);
@@ -3915,26 +4194,31 @@ function drawPlayerHud() {
     setA(1); setC(GREEN); rrect(16, 16, 336, 112, 12, true);
     drawBrandLogo(28, 40, 52);
 
-    const levelText = 'Lv ' + lvl, levelWidth = strW(levelText) * 0.8;
-    setC(WHITE); txt(96, 26, GL_.name, Math.min(1, (216 - levelWidth - 12) / Math.max(1, strW(GL_.name))));
-    halign = 'right'; setC(GREEN); txt(324, 27, levelText, 0.8); halign = 'left';
-    setC(WHITE); txt(96, 48, 'HP', 0.7);
-    halign = 'right'; setC(GREY); txt(324, 48, Math.ceil(p.hp) + ' / ' + p.hp_max, 0.7); halign = 'left';
+    const levelText = 'Lv ' + lvl, levelSize = IS_TOUCH ? 1 : 0.8, levelWidth = strW(levelText) * levelSize;
+    const name = IS_TOUCH && GL_.name.length > 18 ? Array.from(GL_.name).slice(0, 17).join('') + '…' : GL_.name;
+    const nameSize = Math.min(IS_TOUCH ? 1.2 : 1, (216 - levelWidth - 12) / Math.max(1, strW(name)));
+    const hpSize = IS_TOUCH ? 0.95 : 0.7, xpSize = IS_TOUCH ? 0.9 : 0.6;
+    setC(WHITE); txt(96, 26, name, nameSize);
+    halign = 'right'; setC(GREEN); txt(324, 27, levelText, levelSize); halign = 'left';
+    setC(WHITE); txt(96, 48, 'HP', hpSize);
+    halign = 'right'; setC(GREY); txt(324, 48, Math.ceil(p.hp) + ' / ' + p.hp_max, hpSize); halign = 'left';
     setC(rgb(40, 46, 58)); rect(96, 64, 324, 74);
     setC(hpColour(hp)); rect(96, 64, 96 + 228 * hp, 74);
     if (p.hit_flash > 0) { setA(p.hit_flash / 10); setC(WHITE); rect(96, 64, 324, 74, true); setA(1); }
-    setC(GREY); txt(96, 81, 'XP', 0.6);
-    halign = 'right'; txt(324, 81, GL_.exp + ' / ' + next, 0.6); halign = 'left';
+    setC(GREY); txt(96, 81, 'XP', xpSize);
+    halign = 'right'; txt(324, 81, GL_.exp + ' / ' + next, xpSize); halign = 'left';
     setC(rgb(40, 46, 58)); rect(96, 96, 324, 100);
     setC(GREEN); rect(96, 96, 96 + 228 * xp, 100);
 
-    setA(0.85); setC(DARK); rrect(16, 118, 336, 144, 10);
-    setA(1); setC(GREY); txt(28, 123, dateText());
-    setC(GREEN); halign = 'right'; txt(326, 123, timeText()); halign = 'left';
+    if (!IS_TOUCH) {
+        setA(0.85); setC(DARK); rrect(16, 118, 336, 144, 10);
+        setA(1); setC(GREY); txt(28, 123, dateText());
+        setC(GREEN); halign = 'right'; txt(326, 123, timeText()); halign = 'left';
+    }
     const ab = [['F', 'Shield', p.shield_cd, 8 * 60, rgb(98, 200, 244)], ['H', 'Heal', p.heal_cd, 10 * 60, rgb(98, 226, 106)],
                 ['G', 'x' + GL_.grenades, p.grenade_cd, 50, rgb(150, 220, 120)]];
     for (let i = 0; i < 3; i++) {
-        const ax = 16 + i * 108, ay = 150, aw = 104;
+        const ax = 16 + i * 108, ay = IS_TOUCH ? 118 : 150, aw = 104;
         let ready = ab[i][2] <= 0;
         if (i === 2 && GL_.grenades <= 0) ready = false;
         setA(0.85); setC(DARK); rrect(ax, ay, ax + aw, ay + 30, 10);
@@ -3951,6 +4235,7 @@ function drawPlayerHud() {
         txt(ax + (i === 2 ? 52 : 32), ay + 7, lbl, 0.8);
     }
     setC(WHITE);
+    ctx.restore();
 }
 function drawWeaponBar(barY2) {
     const n = WEAPON_ORDER.length, cols = 6, sz = 36, gap = 4, rows = Math.ceil(n / cols);
@@ -4084,6 +4369,14 @@ function makeTitle() {
     return { menu: ['START', 'CONTROLS'], sel: 0, t: 0, show_controls: false, fade: 0, starting: false, mx_prev: 0, my_prev: 0,
              walkers: CD.presets.map((p, i) => ({ look: lookCopy(p.look), x: -80 - i * 150, spd: rr(1.6, 2.2) })) };
 }
+function titleMenuBounds(i) {
+    if (IS_TOUCH) {
+        const x = 112 + i * 536;
+        return [x, 400, x + 520, 576];
+    }
+    const y = 420 + i * 64;
+    return [490, y, 790, y + 52];
+}
 function titleStep(T) {
     T.t += 1;
     const mx = M.x, my = M.y, click = M.pressed;
@@ -4098,8 +4391,7 @@ function titleStep(T) {
     if (kp('down') || kp('s')) { T.sel = (T.sel + 1) % n; kdSfx('snd_ui_click'); }
     let go = kp('enter') || kp('space') || kp('e');
     for (let i = 0; i < n; i++) {
-        const by = 420 + i * 64;
-        if (inR(mx, my, 640 - 150, by, 640 + 150, by + 52)) {
+        if (inB(mx, my, titleMenuBounds(i))) {
             if (T.sel !== i && (mx !== T.mx_prev || my !== T.my_prev)) { T.sel = i; kdSfx('snd_ui_click', 0.1, 0.5); }
             if (click) { T.sel = i; go = true; }
         }
@@ -4119,14 +4411,14 @@ function titleDraw(T) {
     setC(WHITE); txt(640, 262 + bob, 'K R A C K E D D E V S   L A B', 2);
     setC(GREY); txt(640, 312, 'Learn. Build. Ship.', 1.3);
     for (let i = 0; i < T.menu.length; i++) {
-        const by = 420 + i * 64, on = i === T.sel;
-        setA(0.9); setC(on ? rgb(30, 70, 46) : DARK); rrect(640 - 150, by, 640 + 150, by + 52, 14);
-        setA(1); setC(on ? GREEN : GREY); rrect(640 - 150, by, 640 + 150, by + 52, 14, true);
+        const [x1, y1, x2, y2] = titleMenuBounds(i), on = i === T.sel;
+        setA(0.9); setC(on ? rgb(30, 70, 46) : DARK); rrect(x1, y1, x2, y2, 14);
+        setA(1); setC(on ? GREEN : GREY); rrect(x1, y1, x2, y2, 14, true);
         let label = T.menu[i];
-        if (on && idiv(T.t, 20) % 2 === 0) label = '> ' + label + ' <';
-        setC(on ? GREEN : WHITE); txt(640, by + 14, label, 1.5);
+        if (on && !IS_TOUCH && idiv(T.t, 20) % 2 === 0) label = '> ' + label + ' <';
+        setC(on ? GREEN : WHITE); txt((x1 + x2) / 2, y1 + (IS_TOUCH ? 62 : 14), label, IS_TOUCH ? 2.8 : 1.5);
     }
-    setC(GREY); txt(640, 556, IS_TOUCH ? 'Tap to choose' : 'W / S or arrows to choose   -   ENTER or click to select', 0.9);
+    if (!IS_TOUCH) { setC(GREY); txt(640, 556, 'W / S or arrows to choose   -   ENTER or click to select', 0.9); }
     halign = 'left';
     for (let i = 0; i < T.walkers.length; i++) { const w = T.walkers[i]; kdDraw(w.x, 712, 1, 'walk', idiv(T.t, 6) + i, w.look, 3, WHITE, 1, true); }
     setC(GREY); txt(16, 16, 'KDlab1   |   12 weapons   |   7 rooms', 0.8);
@@ -4137,7 +4429,7 @@ function titleDraw(T) {
         txt(270, 56, 'Controls', 2);
         const rows = IS_TOUCH ? [
             ['Stick', 'Walk, climb ladders / stairs (push fully to run)'], ['JUMP / DASH', 'Jump and dash'], ['E', 'Use a station, open a box, go through a door'],
-            ['Touch the screen', 'Aim and shoot / swing'], ['NEXT', 'Switch weapon'], ['Q', 'Holster or draw your weapon'],
+            ['FIRE', 'Tap to shoot / swing · drag to aim'], ['NEXT', 'Switch weapon'], ['Q', 'Holster or draw your weapon'],
             ['F', 'Shield dome - blocks explosions'], ['H', 'Heal 40 HP'], ['G', 'Throw a grenade where you aim'], ['MAP', 'Lab map: corner / big / hidden'],
             ['Top-right icons', 'Discord, chat and settings']
         ] : [
@@ -4183,10 +4475,11 @@ function grenadeThrowStep(p) {
     if (p.throw_t <= 0) { p.throw_ang = 0; return; }
     p.throw_t -= 1;
     p.throw_ang = throwAngle(p.throw_t);
-    p.facing = mouseRoomX() >= p.x ? 1 : -1;
+    const tx = aimRoomX(p), ty = aimRoomY(p);
+    p.facing = tx >= p.x ? 1 : -1;
     if (!p.thrown && p.throw_t <= THROW_TIME * 0.5) {
         p.thrown = true;
-        const h = throwHand(p), dir = pdir(h[0], h[1], mouseRoomX(), mouseRoomY()), dist = pdist(h[0], h[1], mouseRoomX(), mouseRoomY());
+        const h = throwHand(p), dir = pdir(h[0], h[1], tx, ty), dist = pdist(h[0], h[1], tx, ty);
         const b = makeBullet(h[0], h[1], dir, clamp(2.2 + dist / 45, 3, 5.8), { kind: 'grenade', thrown: true, life: 600, life_max: 600, grav: 0.2, blast: 34, blast_knock: 11, blast_damage: 50, knock: 0, damage: 0, angle: dir, weapon_key: 'thrown_grenade' });
         b.vsp -= 1.3;
         R.bullets.push(b);
@@ -4295,6 +4588,7 @@ function makeShowcase(key, x, y) {
     return { key, spr, x, y, info: SHOWCASE[key], bl: x + bb[0], bt: y + bb[1], br: x + bb[2], bb: y + bb[3], hover: false, glow: 0, near: false, opened: 0, t: irandom(100) };
 }
 function showcaseHovered() {
+    if (M.source === 'touch' && !M.pressed && !M.touchAim) return null;
     if (!R.show.length || GL_.ui_block || M.overButton) return null;
     const mx = mouseRoomX(), my = mouseRoomY();
     let hit = null;
@@ -4429,8 +4723,9 @@ function step() {
     // End Step
     if (R.player && R.player.gun) gunEndStep(R.player.gun);
     cameraFollow();
+    if (M.touchAim && R.player) rememberCanvasAim(R.player);
     K.pressed.clear();
-    M.pressed = false;
+    M.pressed = M.touchFireTap = false;
     M.wheel = 0;
     if (pendingRoom) { const r = pendingRoom; pendingRoom = null; roomGoto(r); }
 }
@@ -4552,18 +4847,31 @@ void main(){
     gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true);
     const u = n => gl.getUniformLocation(pr, n);
-    Object.assign(GLX, { gl, pr, tex, u_time: u('u_time'), u_texel: u('u_texel'), u_mode: u('u_mode'), u_pix: u('u_pix'), u_flash: u('u_flash') });
+    Object.assign(GLX, { gl, pr, tex, filter: null, texWidth: 0, texHeight: 0,
+        u_time: u('u_time'), u_texel: u('u_texel'), u_mode: u('u_mode'), u_pix: u('u_pix'), u_flash: u('u_flash') });
     return true;
 }
+viewCv.addEventListener('webglcontextlost', event => event.preventDefault());
+viewCv.addEventListener('webglcontextrestored', glInit);
 let fallback2D = null;
 function present() {
     if (GLX.gl) {
         const gl = GLX.gl;
+        if (gl.isContextLost()) return;
         gl.viewport(0, 0, viewCv.width, viewCv.height);
         const filt = viewCv.width >= gameCv.width ? gl.NEAREST : gl.LINEAR;
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt);
-        gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
-        gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gameCv);
+        if (filt !== GLX.filter) {
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, filt);
+            gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, filt);
+            GLX.filter = filt;
+        }
+        if (gameCv.width !== GLX.texWidth || gameCv.height !== GLX.texHeight) {
+            gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, gameCv);
+            GLX.texWidth = gameCv.width;
+            GLX.texHeight = gameCv.height;
+        } else {
+            gl.texSubImage2D(gl.TEXTURE_2D, 0, 0, 0, gl.RGBA, gl.UNSIGNED_BYTE, gameCv);
+        }
         gl.uniform1f(GLX.u_time, performance.now() / 1000);
         gl.uniform2f(GLX.u_texel, 1 / 1280, 1 / 720);
         gl.uniform1f(GLX.u_mode, GL_.shader);
@@ -4583,8 +4891,7 @@ function render() {
     present();
     GX.setTransform(1, 0, 0, 1, 0, 0);
     GX.clearRect(0, 0, guiCv.width, guiCv.height);
-    const s = guiCv.width / GUI_W;
-    GX.setTransform(s, 0, 0, s, 0, 0);
+    GX.setTransform(guiCv.width / GUI_W, 0, 0, guiCv.height / GUI_H, 0, 0);
     GX.imageSmoothingEnabled = false;
     G.drawGui();
     if (window.KD_TOUCH) window.KD_TOUCH.update(GL_.ui_block || !!R.title, !!(R.player && R.player.gun));
@@ -4593,34 +4900,60 @@ function render() {
 // =====================================================================
 // layout (PC + phone portrait / landscape)
 // =====================================================================
+function sizeCanvas(canvas, width, height) {
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+}
+
 function layout() {
-    const vw = window.innerWidth, vh = window.innerHeight;
-    const portrait = vh > vw;
-    let w, h, x, y;
-    if (IS_TOUCH && portrait) {
-        w = vw; h = Math.round(vw * 9 / 16);
-        x = 0; y = Math.max(0, Math.round(Math.min(vh * 0.08, 64)));
-    } else {
-        w = Math.min(vw, vh * 16 / 9); h = w * 9 / 16;
-        x = Math.round((vw - w) / 2); y = Math.round((vh - h) / 2);
-    }
+    const vv = window.visualViewport;
+    const useVisualViewport = IS_TOUCH && vv?.scale === 1 && !textKind;
+    const vw = useVisualViewport ? vv.width : window.innerWidth;
+    const vh = useVisualViewport ? vv.height : window.innerHeight;
+    const portrait = IS_TOUCH && window.innerHeight > window.innerWidth;
+    const style = getComputedStyle(document.documentElement);
+    const inset = side => IS_TOUCH ? parseFloat(style.getPropertyValue('--safe-' + side)) || 0 : 0;
+    const left = inset('left'), top = inset('top');
+    const width = Math.max(1, vw - left - inset('right'));
+    const height = Math.max(1, vh - top - inset('bottom'));
+    // Keep phone shortcuts above the game and reserve space below it for portrait controls.
+    const topBar = IS_TOUCH ? Math.min(portrait ? 60 : 56, height * 0.2) : 0;
+    const belowBar = height - topBar;
+    const stageHeight = portrait ? Math.max(Math.min(120, belowBar * 0.45), belowBar - 230) : belowBar;
+    const w = Math.min(width, stageHeight * 16 / 9), h = w * 9 / 16;
+    const x = left + (width - w) / 2;
+    const y = top + topBar + (portrait ? 0 : (belowBar - h) / 2);
+    const geometryChanged = x !== stageRect.x || y !== stageRect.y || w !== stageRect.w || h !== stageRect.h;
+    if (IS_TOUCH && geometryChanged) resetTouchInput();
     stageRect = { x, y, w, h };
     for (const c of [viewCv, guiCv]) {
         c.style.left = x + 'px'; c.style.top = y + 'px';
         c.style.width = w + 'px'; c.style.height = h + 'px';
     }
-    const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    viewCv.width = Math.round(w * dpr); viewCv.height = Math.round(h * dpr);
-    guiCv.width = Math.round(w * dpr); guiCv.height = Math.round(h * dpr);
-    SC = clamp(Math.ceil(viewCv.height / VIEW_H), 1, IS_TOUCH ? 4 : 6);
-    gameCv.width = VIEW_W * SC; gameCv.height = VIEW_H * SC;
-    document.body.classList.toggle('portrait', IS_TOUCH && portrait);
+    const dpr = window.devicePixelRatio || 1;
+    const worldDpr = Math.min(dpr, IS_TOUCH ? 1.5 : 3);
+    const guiDpr = Math.min(dpr, IS_TOUCH ? 2 : 3);
+    sizeCanvas(viewCv, Math.max(1, Math.round(w * worldDpr)), Math.max(1, Math.round(h * worldDpr)));
+    sizeCanvas(guiCv, Math.max(1, Math.round(w * guiDpr)), Math.max(1, Math.round(h * guiDpr)));
+    SC = clamp(Math.ceil(viewCv.height / VIEW_H), 1, IS_TOUCH ? 2 : 6);
+    sizeCanvas(gameCv, VIEW_W * SC, VIEW_H * SC);
+    document.body.classList.toggle('portrait', portrait);
     document.body.classList.toggle('touch', IS_TOUCH);
-    if (window.KD_TOUCH) window.KD_TOUCH.layout(stageRect, IS_TOUCH && portrait);
+    if (window.KD_TOUCH) window.KD_TOUCH.layout(stageRect, portrait);
     if (textKind) placeTextInput();
 }
-window.addEventListener('resize', layout);
-window.addEventListener('orientationchange', () => setTimeout(layout, 200));
+
+let layoutFrame = 0;
+function scheduleLayout() {
+    if (layoutFrame) return;
+    layoutFrame = requestAnimationFrame(() => {
+        layoutFrame = 0;
+        layout();
+    });
+}
+window.addEventListener('resize', scheduleLayout);
+window.visualViewport?.addEventListener('resize', scheduleLayout);
+document.addEventListener('fullscreenchange', scheduleLayout);
 document.addEventListener('visibilitychange', () => {
     if (!AU.ctx) return;
     if (document.hidden) AU.ctx.suspend().catch(() => {});
@@ -4642,7 +4975,17 @@ function frame(t) {
     requestAnimationFrame(frame);
 }
 
-window.KD_GAME = { vkey, IS_TOUCH, layout, M, start: null, debug: { G, GL_, get R() { return R; }, cam, roomGoto: n => roomGoto(n), get VIEW() { return [VIEW_W, VIEW_H]; } } };
+function hudAction(action) {
+    if (!R || R.title || GL_.ui_block || G.chat_typing || G.settings_open) return;
+    audioUnlock();
+    G.activateHUD(action);
+    if (G.chat_typing || G.settings_open) {
+        GL_.ui_block = true;
+        resetTouchInput();
+    }
+}
+
+window.KD_GAME = { vkey, touchFire, touchFireAim, hudAction, IS_TOUCH, layout, M, start: null, debug: { G, GL_, get R() { return R; }, cam, roomGoto: n => roomGoto(n), get VIEW() { return [VIEW_W, VIEW_H]; } } };
 
 // Keep a chosen character through the Discord redirect without storing auth data.
 try {
@@ -4660,7 +5003,7 @@ if (presence) {
     presence.init({
         onHits: applyLiveHits,
         onPresenceReset() { liveHitEffects.clear(); },
-        onFocus() { K.down.clear(); K.pressed.clear(); M.down = false; },
+        onFocus: resetInput,
         beforeLogin() {
             try { sessionStorage.setItem('kd-discord-character', JSON.stringify({ look: GL_.look, guestName: discordIdentity ? guestName : GL_.name })); } catch {}
         },
@@ -4675,6 +5018,7 @@ if (presence) {
                 GL_.name = guestName;
                 discordIdentity = false;
             }
+            if (touchSettings.open) refreshTouchName();
         },
         getState() {
             const p = R?.player;
