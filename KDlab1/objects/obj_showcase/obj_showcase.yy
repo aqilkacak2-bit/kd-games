@@ -32,7 +32,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":false,
-  "spriteId":{"name":"spr_show_kracked","path":"sprites/spr_show_kracked/spr_show_kracked.yy",},
+  "spriteId":{
+    "name":"spr_show_kracked",
+    "path":"sprites/spr_show_kracked/spr_show_kracked.yy",
+  },
   "spriteMaskId":null,
   "visible":true,
 }

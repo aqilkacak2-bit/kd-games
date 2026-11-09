@@ -906,7 +906,7 @@ function kd_vfx_shield(_pl)
     {
         depth  = _pl.depth - 5;
         C      = kd_pal().ice;
-        RAD    = 22;
+        RAD    = 29;
         GONE   = 2.75;
         hits   = [];
         lights = [];

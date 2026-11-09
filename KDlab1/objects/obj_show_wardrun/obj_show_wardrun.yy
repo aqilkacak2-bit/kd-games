@@ -1,8 +1,7 @@
 {
   "$GMObject":"",
   "%Name":"obj_show_wardrun",
-  "eventList":[
-  ],
+  "eventList":[],
   "managed":true,
   "name":"obj_show_wardrun",
   "overriddenProperties":[],
@@ -10,7 +9,10 @@
     "name":"Weapons",
     "path":"folders/Weapons.yy",
   },
-  "parentObjectId":{"name":"obj_showcase","path":"objects/obj_showcase/obj_showcase.yy",},
+  "parentObjectId":{
+    "name":"obj_showcase",
+    "path":"objects/obj_showcase/obj_showcase.yy",
+  },
   "persistent":false,
   "physicsAngularDamping":0.1,
   "physicsDensity":0.5,
@@ -28,7 +30,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":false,
-  "spriteId":{"name":"spr_show_wardrun","path":"sprites/spr_show_wardrun/spr_show_wardrun.yy",},
+  "spriteId":{
+    "name":"spr_show_wardrun",
+    "path":"sprites/spr_show_wardrun/spr_show_wardrun.yy",
+  },
   "spriteMaskId":null,
   "visible":true,
 }

@@ -1,6 +1,6 @@
 # KDlab1 (GameMaker project)
 
-Open `KDlab1.yyp` in GameMaker (2024.14+).
+Open `KD_cs.yyp` in GameMaker (2024.14+).
 
 Rooms: Title -> Character Lab -> Showcase Hall -> Kuala Lumpur street -> KD Lab -> Training Range / Rooftop
 

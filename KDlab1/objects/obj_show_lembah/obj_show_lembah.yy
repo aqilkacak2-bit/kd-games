@@ -1,8 +1,7 @@
 {
   "$GMObject":"",
   "%Name":"obj_show_lembah",
-  "eventList":[
-  ],
+  "eventList":[],
   "managed":true,
   "name":"obj_show_lembah",
   "overriddenProperties":[],
@@ -10,7 +9,10 @@
     "name":"Weapons",
     "path":"folders/Weapons.yy",
   },
-  "parentObjectId":{"name":"obj_showcase","path":"objects/obj_showcase/obj_showcase.yy",},
+  "parentObjectId":{
+    "name":"obj_showcase",
+    "path":"objects/obj_showcase/obj_showcase.yy",
+  },
   "persistent":false,
   "physicsAngularDamping":0.1,
   "physicsDensity":0.5,
@@ -28,7 +30,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":false,
-  "spriteId":{"name":"spr_show_lembah","path":"sprites/spr_show_lembah/spr_show_lembah.yy",},
+  "spriteId":{
+    "name":"spr_show_lembah",
+    "path":"sprites/spr_show_lembah/spr_show_lembah.yy",
+  },
   "spriteMaskId":null,
   "visible":true,
 }

@@ -13,7 +13,10 @@
     "name":"Weapons",
     "path":"folders/Weapons.yy",
   },
-  "parentObjectId":{"name":"obj_solid","path":"objects/obj_solid/obj_solid.yy",},
+  "parentObjectId":{
+    "name":"obj_solid",
+    "path":"objects/obj_solid/obj_solid.yy",
+  },
   "persistent":false,
   "physicsAngularDamping":0.1,
   "physicsDensity":0.5,
@@ -31,7 +34,10 @@
   "resourceType":"GMObject",
   "resourceVersion":"2.0",
   "solid":false,
-  "spriteId":{"name":"spr_item_box","path":"sprites/spr_item_box/spr_item_box.yy",},
+  "spriteId":{
+    "name":"spr_item_box",
+    "path":"sprites/spr_item_box/spr_item_box.yy",
+  },
   "spriteMaskId":null,
   "visible":true,
 }
