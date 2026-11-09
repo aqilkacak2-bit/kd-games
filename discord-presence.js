@@ -5,6 +5,7 @@
     const ROOMS = new Set(['rm_select', 'rm_showcase', 'rm_kl', 'rm_main', 'rm_range', 'rm_rooftop']);
     const LOOK_LIMITS = { hair: 5, hair_col: 9, face: 5, skin: 5, top: 5, top_col: 9, bottom: 2, bottom_col: 7 };
     const peers = new Map();
+    let playerSnapshot = null;
     const HIT_WEAPONS = new Set(['smg', 'shotgun', 'sniper', 'burst', 'ricochet', 'keris', 'laser', 'lightning', 'flame', 'rocket', 'grenade', 'freeze', 'thrown_grenade']);
     const hitQueue = new Map(), seenHitEvents = new Set();
     let hitSequence = 0, lastHitFlush = 0;
@@ -31,6 +32,7 @@
         const state = value.state === null ? null : validState(value.state);
         if (value.state !== null && !state) return;
         const old = peers.get(value.id);
+        playerSnapshot = null;
         peers.set(value.id, {
             id: value.id, name: value.name.slice(0, 64), state,
             x: old?.x ?? state?.x ?? 0, y: old?.y ?? state?.y ?? 0,
@@ -68,6 +70,7 @@
         const previous = socket;
         socket = null;
         peers.clear();
+        playerSnapshot = null;
         hitQueue.clear();
         seenHitEvents.clear();
         hitSequence = 0;
@@ -231,10 +234,11 @@
             const previousCount = peers.size;
             if (message.type === 'welcome' && Array.isArray(message.players)) {
                 peers.clear();
+                playerSnapshot = null;
                 for (const player of message.players.slice(0, 256)) acceptPlayer(player);
             } else if (message.type === 'presence' && (peers.has(message.player?.id) || peers.size < 256)) acceptPlayer(message.player);
             else if (message.type === 'leave') {
-                peers.delete(message.id);
+                if (peers.delete(message.id)) playerSnapshot = null;
                 hitQueue.delete(message.id);
             }
             if (message.type === 'welcome' || peers.size !== previousCount) render();
@@ -245,6 +249,7 @@
             clearInterval(heartbeat);
             socket = null;
             peers.clear();
+            playerSnapshot = null;
             hitQueue.clear();
             seenHitEvents.clear();
             if (hooks.onPresenceReset) hooks.onPresenceReset();
@@ -286,6 +291,7 @@
         const elapsed = lastFrame ? Math.min(now - lastFrame, 250) : 16;
         lastFrame = now;
         const amount = 1 - Math.exp(-elapsed / 70);
+        if (peers.size) playerSnapshot = null;
         for (const peer of peers.values()) {
             if (!peer.state) continue;
             const snap = Math.hypot(peer.state.x - peer.x, peer.state.y - peer.y) > 120;
@@ -375,10 +381,15 @@
         enterGame() { if (panel) { document.body.append(panel); panel.classList.add('floating'); } },
         get user() { return user; },
         players() {
+            if (playerSnapshot) return playerSnapshot;
             const now = performance.now();
-            return Array.from(peers.values()).filter(peer => peer.state).map(peer => ({
-                ...peer, frame: peer.state.frame + (now - peer.receivedAt) / 1000 * (peer.state.state === 'walk' ? 10 : 4)
-            }));
+            playerSnapshot = [];
+            for (const peer of peers.values()) {
+                if (!peer.state) continue;
+                const frame = peer.state.frame + (now - peer.receivedAt) / 1000 * (peer.state.state === 'walk' ? 10 : 4);
+                playerSnapshot.push({ ...peer, frame });
+            }
+            return playerSnapshot;
         }
     };
 })();

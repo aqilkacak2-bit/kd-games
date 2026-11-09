@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 
 const html = readFileSync(new URL('../../index.html', import.meta.url), 'utf8');
 const names = [
-  'liveHitPose', 'stepLiveHitEffects', 'applyLiveHits', 'liveHitFlash',
+  'liveHitPose', 'stepLiveHitEffects', 'startLiveHitEffect', 'playLiveHitSound', 'applyLiveHits',
   'reportLiveHit', 'segRectEntry', 'firstSolidOnSegment', 'liveTargetsOnSegment',
   'makeBullet', 'bSetSpeed', 'pointSolid', 'bulletStep', 'reportLiveExplosion',
   'kdExplode', 'beamUpdate', 'lightningFire', 'swordHit',
@@ -30,7 +30,7 @@ function fixture() {
     R: { player, npcs: [], boxes: [], solids: [], kfx: [], w: 1000, h: 400, title: null },
     GL_: { flash: 0, shake: 0 },
     presence: { user: { id: '100000000000000001' }, players: () => peers, reportHit: (...args) => { reports.push(args); return true; } },
-    liveHitEffects: new Map(), WEAPONS: weapons, WHITE: 0xffffff, PAL: { wall: {} },
+    liveHitEffects: new Map(), lastLiveHitSound: -Infinity, performance: { now: () => 0 }, WEAPONS: weapons, WHITE: 0xffffff, PAL: { wall: {} },
     npcBox: n => [Math.round(n.x) - 6, Math.round(n.y) - 26, Math.round(n.x) + 7, Math.round(n.y)],
     lerp: (a, b, t) => a + (b - a) * t,
     pdist: (x, y, a, b) => Math.hypot(a - x, b - y),
@@ -68,11 +68,11 @@ test('all weapon reactions leave player state intact and expire visually', () =>
     ] });
     assert.equal(JSON.stringify(player), before);
     assert.equal(JSON.stringify(peers), peerBefore);
-    assert.equal(context.liveHitFlash(context.presence.user.id), true);
+    assert.equal(context.liveHitEffects.get(context.presence.user.id).age, 0);
     const pose = context.liveHitPose(context.presence.user.id, player.x, player.y);
     assert.notEqual(pose[0], player.x);
   }
-  assert.equal(impacts.length, weaponKeys.length * 2);
+  assert.equal(impacts.length, 0, 'Shared hits do not spawn a heavy particle burst');
   for (let frame = 0; frame < 75; frame++) context.stepLiveHitEffects();
   assert.equal(context.liveHitEffects.size, 0);
   assert.equal(JSON.stringify(player), before);
@@ -80,11 +80,53 @@ test('all weapon reactions leave player state intact and expire visually', () =>
 
 test('swept bullet contact reaches a fast-moving segment and stops normally', () => {
   const { context, reports } = fixture();
+  let wallScans = 0;
+  const firstSolidOnSegment = context.firstSolidOnSegment;
+  context.firstSolidOnSegment = (...args) => {
+    wallScans++;
+    return firstSolidOnSegment(...args);
+  };
   const bullet = context.makeBullet(70, 137, 0, 60, { weapon_key: 'smg' });
   context.bulletStep(bullet);
+  assert.equal(wallScans, 1);
   assert.equal(reports.length, 1);
   assert.equal(reports[0][0], 'smg');
   assert.equal(bullet.dead, true);
+});
+
+test('the shooter reacts at bullet contact and its server echo does not restart the effect', () => {
+  const { context, peers, reports, impacts } = fixture();
+  const target = peers[0];
+  const shot = () => context.bulletStep(context.makeBullet(70, 137, 0, 60, { weapon_key: 'smg' }));
+
+  shot();
+  assert.equal(reports.length, 1);
+  assert.equal(context.liveHitEffects.get(target.id).age, 0);
+  assert.equal(impacts.length, 0);
+
+  context.stepLiveHitEffects();
+  shot();
+  assert.equal(reports.length, 2, 'Visual debounce does not block hit reports');
+  const echo = { hits: [{ targetId: target.id, weapon: 'smg', dir: 0 }] };
+  context.applyLiveHits({ ...echo, attackerId: context.presence.user.id });
+  assert.equal(context.liveHitEffects.get(target.id).age, 1);
+
+  context.applyLiveHits({ ...echo, attackerId: '300000000000000001' });
+  assert.equal(context.liveHitEffects.get(target.id).age, 0, 'Other shooters still react from the server event');
+  assert.equal(impacts.length, 0);
+});
+
+test('guest bullets skip the live collision sweep while wall impacts still render', () => {
+  const { context, reports, impacts } = fixture();
+  context.presence.user = null;
+  context.firstSolidOnSegment = () => assert.fail('A guest ran a live-player sweep');
+  const clearShot = context.makeBullet(70, 137, 0, 60, { weapon_key: 'smg' });
+  context.bulletStep(clearShot);
+  assert.equal(clearShot.dead, false);
+  context.R.solids.push({ x1: 60, y1: 0, x2: 100, y2: 200 });
+  context.bulletStep(context.makeBullet(70, 137, 0, 60, { weapon_key: 'smg' }));
+  assert.equal(reports.length, 0);
+  assert.equal(impacts.length, 1);
 });
 
 test('thin walls prevent peer hits on this step and later tunneled steps', () => {

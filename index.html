@@ -985,6 +985,7 @@ const presence = window.KD_PRESENCE;
 
 // Shared hits animate an offset and flash; player simulation is never changed.
 const liveHitEffects = new Map();
+let lastLiveHitSound = -Infinity;
 function liveHitPose(id, x, y) {
     const effect = liveHitEffects.get(id);
     if (!effect) return [x, y];
@@ -997,33 +998,51 @@ function stepLiveHitEffects() {
         if (effect.age >= 75) liveHitEffects.delete(id);
     }
 }
+function startLiveHitEffect(id, weaponKey, dir) {
+    const weapon = weaponKey === 'thrown_grenade' ? WEAPONS.grenade : WEAPONS[weaponKey];
+    if (!weapon) return false;
+    let text = 'Hey! Watch it!';
+    if (weaponKey === 'flame') text = 'Hot! Hot!';
+    if (weaponKey === 'freeze') text = 'Brrr!';
+    if (weaponKey === 'lightning') text = 'BZZZT!';
+    if (weaponKey === 'keris') text = 'Easy there!';
+    if (['rocket', 'grenade', 'thrown_grenade'].includes(weaponKey)) text = 'Whoa!';
+    const strength = Math.min(7, weapon.knock || weapon.blast_knock || 1);
+    liveHitEffects.set(id, { age: 0, kick: ldx(strength, dir), text });
+    return true;
+}
+function playLiveHitSound() {
+    const now = performance.now();
+    if (now - lastLiveHitSound < 80) return;
+    lastLiveHitSound = now;
+    kdSfx('snd_hit', 0.1, 0.55);
+}
 function applyLiveHits(message) {
-    if (!R || R.title) return;
-    const peers = presence ? presence.players() : [];
+    if (!R || R.title || !presence || message.attackerId === presence.user?.id) return;
+    const peers = presence.players();
     let reacted = false;
     for (const hit of message.hits) {
-        const target = hit.targetId === presence?.user?.id ? R.player : peers.find(peer => peer.id === hit.targetId);
-        if (!target) continue;
-        const weapon = hit.weapon === 'thrown_grenade' ? WEAPONS.grenade : WEAPONS[hit.weapon];
-        if (!weapon) continue;
-        let text = 'Hey! Watch it!';
-        if (hit.weapon === 'flame') text = 'Hot! Hot!';
-        if (hit.weapon === 'freeze') text = 'Brrr!';
-        if (hit.weapon === 'lightning') text = 'BZZZT!';
-        if (hit.weapon === 'keris') text = 'Easy there!';
-        if (['rocket', 'grenade', 'thrown_grenade'].includes(hit.weapon)) text = 'Whoa!';
-        const strength = Math.min(7, weapon.knock || weapon.blast_knock || 1);
-        liveHitEffects.set(hit.targetId, { age: 0, kick: ldx(strength, hit.dir), text });
-        vfxImpact(target.x, target.y - 13, hit.dir, false, null, 0, target.y, 0.65);
-        reacted = true;
+        const target = hit.targetId === presence.user?.id ? R.player : peers.find(peer => peer.id === hit.targetId);
+        if (target && startLiveHitEffect(hit.targetId, hit.weapon, hit.dir)) reacted = true;
     }
-    if (reacted) kdSfx('snd_hit', 0.1, 0.55);
+    if (reacted) playLiveHitSound();
 }
-function liveHitFlash(id) {
-    return (liveHitEffects.get(id)?.age ?? 75) < 8;
+function drawLiveHitFlash(id, x, y) {
+    const age = liveHitEffects.get(id)?.age ?? 8;
+    if (age >= 8) return;
+    const fade = 1 - age / 8;
+    setC(WHITE); setA(fade);
+    const width = LW;
+    LW = 1.5;
+    circle(x, y - 13, 6 + age, true);
+    LW = width;
+    setA(1);
 }
 function reportLiveHit(peer, weapon, x, y, dir) {
-    if (presence) presence.reportHit(weapon, peer.id, x, y, dir);
+    if (!presence?.reportHit(weapon, peer.id, x, y, dir)) return;
+    // Show contact immediately on the shooter. The server validates it for other players.
+    if ((liveHitEffects.get(peer.id)?.age ?? 9) < 9) return;
+    if (startLiveHitEffect(peer.id, weapon, dir)) playLiveHitSound();
 }
 
 const levelFromExp = e => Math.floor(Math.sqrt(e / 100)) + 1;
@@ -2529,11 +2548,12 @@ function firstSolidOnSegment(x1, y1, x2, y2) {
     }
     return wallFraction;
 }
-function liveTargetsOnSegment(x1, y1, x2, y2, ignored = []) {
-    if (!presence) return [];
-    const wallFraction = firstSolidOnSegment(x1, y1, x2, y2);
+function liveTargetsOnSegment(x1, y1, x2, y2, ignored = [], wallFraction) {
+    const peers = presence?.players();
+    if (!peers?.length) return [];
+    wallFraction ??= firstSolidOnSegment(x1, y1, x2, y2);
     const hits = [];
-    for (const peer of presence.players()) {
+    for (const peer of peers) {
         if (ignored.includes(peer.id)) continue;
         const entry = segRectEntry(x1, y1, x2, y2, npcBox(peer));
         if (entry !== null && entry < wallFraction) hits.push({ peer, entry, x: lerp(x1, x2, entry), y: lerp(y1, y2, entry) });
@@ -2916,7 +2936,7 @@ function gunDraw(g) {
 function bulletStep(b) {
     b.xprev = b.x; b.yprev = b.y;
     b.life -= 1;
-    let hit = false, wall = false;
+    let hit = false, wall = false, hitPeer = false;
     switch (b.kind) {
         case 'rocket':
             bSetSpeed(b, Math.min(bSpeed(b) + 0.3, 9));
@@ -2973,9 +2993,10 @@ function bulletStep(b) {
                 else hit = true;
         }
     }
-    if (!wall && !hit && !b.live_path_blocked) {
-        const wallFraction = firstSolidOnSegment(b.x, b.y, b.x + b.hsp, b.y + b.vsp);
-        const contacts = liveTargetsOnSegment(b.x, b.y, b.x + b.hsp, b.y + b.vsp, b.hit_list);
+    if (presence?.user && !wall && !hit && !b.live_path_blocked) {
+        const x2 = b.x + b.hsp, y2 = b.y + b.vsp;
+        const wallFraction = firstSolidOnSegment(b.x, b.y, x2, y2);
+        const contacts = liveTargetsOnSegment(b.x, b.y, x2, y2, b.hit_list, wallFraction);
         for (const contact of contacts) {
             b.hit_list.push(contact.peer.id);
             if (b.blast > 0) {
@@ -2985,7 +3006,7 @@ function bulletStep(b) {
             reportLiveHit(contact.peer, b.weapon_key, contact.x, contact.y, bDir(b));
             if (b.kind === 'flame') continue;
             if (b.pierce > 0) b.pierce -= 1;
-            else { b.x = contact.x; b.y = contact.y; hit = true; break; }
+            else { b.x = contact.x; b.y = contact.y; hit = hitPeer = true; break; }
         }
         if (wallFraction <= 1 && !hit && b.kind !== 'grenade') {
             // Share a rocket's first wall impact even if legacy physics crosses
@@ -3006,7 +3027,7 @@ function bulletStep(b) {
                 if (pointSolid(b.xprev, b.y)) n2 = b.vsp > 0 ? 90 : 270;
                 vfxImpact(b.xprev, b.yprev, bDir(b), false, PAL.wall, n2, n2 === 90 ? b.y : 100000, isz);
                 if (b.kind !== 'ice') kdSfx('snd_ricochet', 0.15, 0.5);
-            } else vfxImpact(b.x, b.y, bDir(b), false, null, 0, npc ? npc.y : 100000, isz);
+            } else if (!hitPeer) vfxImpact(b.x, b.y, bDir(b), false, null, 0, npc ? npc.y : 100000, isz);
         }
         b.dead = true;
     }
@@ -4759,19 +4780,15 @@ function drawWorld() {
         const state = peer.state;
         const [x, y] = liveHitPose(peer.id, peer.x, peer.y);
         kdDraw(x, y, state.facing, state.state, peer.frame, state.look, 1, WHITE, 1);
-        if (liveHitFlash(peer.id)) {
-            FOG = WHITE; kdDraw(x, y, state.facing, state.state, peer.frame, state.look, 1, WHITE, 0.8, false); FOG = null;
-        }
+        drawLiveHitFlash(peer.id, x, y);
     }
     if (R.player) {
         const p = R.player, id = presence?.user?.id;
         const [x, y] = liveHitPose(id, p.x, p.y);
         ctx.save(); ctx.translate(x - p.x, y - p.y);
         playerDraw(p);
-        if (liveHitFlash(id)) {
-            FOG = WHITE; kdDraw(p.x, p.y - p.recoil_lift, p.facing, p.state, p.anim_frame, p.look, 1, WHITE, 0.8, false); FOG = null;
-        }
         ctx.restore();
+        drawLiveHitFlash(id, x, y - p.recoil_lift);
     }
     for (const b of R.bullets) bulletDraw(b);
     for (const f of R.kfx) kfxDraw(f);
