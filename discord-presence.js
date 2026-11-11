@@ -2,7 +2,7 @@
 (() => {
     'use strict';
 
-    const ROOMS = new Set(['rm_select', 'rm_showcase', 'rm_kl', 'rm_main', 'rm_range', 'rm_rooftop']);
+    const ROOMS = new Set(['rm_lobby', 'rm_select', 'rm_showcase', 'rm_kl', 'rm_main', 'rm_range', 'rm_rooftop']);
     const LOOK_LIMITS = { hair: 5, hair_col: 9, face: 5, skin: 5, top: 5, top_col: 9, bottom: 2, bottom_col: 7 };
     const peers = new Map();
     let playerSnapshot = null;

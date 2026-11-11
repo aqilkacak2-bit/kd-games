@@ -18,6 +18,7 @@ const HIT_WEAPONS = {
 };
 const DISCORD_API = "https://discord.com/api/v10";
 const ROOMS = {
+  rm_lobby: [763, 321],
   rm_select: [320, 180],
   rm_showcase: [1073, 373],
   rm_kl: [960, 240],

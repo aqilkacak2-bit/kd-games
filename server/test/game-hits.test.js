@@ -51,6 +51,7 @@ function fixture() {
     npcDamage() { assert.fail('A peer reaction called NPC damage'); },
     playerDamage() { assert.fail('A peer reaction called player damage'); },
     kdBoxDamage() {},
+    blastMult: () => 1,
   });
   context.inSolidPoint = (x, y) => context.R.solids.find(solid => x >= solid.x1 && x < solid.x2 && y >= solid.y1 && y < solid.y2);
   vm.runInContext(functions, context);

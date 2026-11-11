@@ -210,23 +210,24 @@ test("members receive private sessions and nonmembers are rejected", async t => 
   assert.equal(outsider.cookie, undefined);
 });
 
-test("room presence uses verified identity and logout removes the player", async t => {
+test("lobby presence uses verified identity and logout removes the player", async t => {
   const { mf } = await runtime(t);
   const alice = await signIn(mf, "alice");
   const bob = await signIn(mf, "bob");
-  const a = await socketClient(mf, alice.cookie);
-  const b = await socketClient(mf, bob.cookie);
+  const a = await socketClient(mf, alice.cookie, "rm_lobby");
+  const b = await socketClient(mf, bob.cookie, "rm_lobby");
   assert.equal(a.welcome.selfId, users.alice.id);
   assert.equal(b.welcome.players.length, 0);
   a.socket.send(JSON.stringify({
     type: "state", id: "forged-id", name: "forged name",
-    state: { x: 100, y: 150, facing: 1, state: "idle", frame: 0, look: appearance },
+    state: { x: 715, y: 308, facing: 1, state: "idle", frame: 0, look: appearance },
   }));
   const update = await b.next();
   assert.equal(update.type, "presence");
   assert.equal(update.player.id, users.alice.id);
   assert.equal(update.player.name, "KD Alice");
-  assert.equal(update.player.state.x, 100);
+  assert.equal(update.player.state.x, 715);
+  assert.equal(update.player.state.y, 308);
   const otherRoom = await socketClient(mf, bob.cookie, "rm_main");
   assert.deepEqual(otherRoom.welcome.players, []);
   const aClosed = closed(a.socket);
