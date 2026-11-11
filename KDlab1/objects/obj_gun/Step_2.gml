@@ -78,7 +78,7 @@ if (_can && _fire && cooldown == 0 && burst_left == 0)
     switch (weapon.type)
     {
         case "melee":
-            cooldown   = weapon.fire_delay;
+            cooldown   = round(weapon.fire_delay * kd_rate_mult());
             swing_dir  = -swing_dir;
             swing_t    = weapon.swing_time;
             swing_hit  = [];
@@ -89,11 +89,11 @@ if (_can && _fire && cooldown == 0 && burst_left == 0)
             beam_on = 3;                         // stays on while the button is held
             break;
         case "lightning":
-            cooldown = weapon.fire_delay;
+            cooldown = round(weapon.fire_delay * kd_rate_mult());
             kd_lightning_fire();
             break;
         default:
-            cooldown    = weapon.fire_delay;
+            cooldown    = round(weapon.fire_delay * kd_rate_mult());
             burst_left  = weapon.burst;
             burst_timer = 0;
     }

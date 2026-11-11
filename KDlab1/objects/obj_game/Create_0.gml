@@ -97,3 +97,21 @@ kd_ambience_update();
 
 // ---------- Discord ----------
 discord_req = -1;
+
+// skill tree (K)
+skills_open  = false;
+st_page      = 0;      // 0 = skills, 1 = trails
+st_hover     = "";
+st_t         = 0;
+st_pulse     = 0;
+st_pulse_key = "";
+
+// Robot Pet Bay + KD Item Shop panels
+pets_open  = false;
+pb_sel     = 0;
+pb_t       = 0;
+shop_open  = false;
+sh_t       = 0;
+sh_hover   = -1;
+sh_pulse   = 0;
+sh_pulse_i = -1;

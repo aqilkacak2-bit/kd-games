@@ -135,6 +135,9 @@ if (instance_exists(obj_player))
     draw_set_colour(c_white);
 }
 
+// ---------- skill tree hint + chips ----------
+if (instance_exists(obj_player)) kd_skill_hud_draw();
+
 // ---------- corner buttons: chat + settings (top right) ----------
 var _hc = point_in_rectangle(_mx, _my, chat_btn[0], chat_btn[1], chat_btn[2], chat_btn[3]) || chat_typing;
 var _hg = point_in_rectangle(_mx, _my, gear_btn[0], gear_btn[1], gear_btn[2], gear_btn[3]) || settings_open;
@@ -281,71 +284,47 @@ if (!select_open)
 {
     var _bar_y2 = 720 - 16;                  // weapon bar sits on the bottom when the map is not in the corner
     if (global.kd_minimap == 1) _bar_y2 = kd_minimap_draw(1280 - 24, 720 - 24, 240, 130, false) - 8;
+    if (global.kd_minimap == 0) _bar_y2 = kd_minimap_mini_draw(1280 - 16, 720 - 16) - 8;      // minimised: just a small tab
 
-    // ----- weapon bar: 12 slots in 2 rows (keys 1-9, 0, -, =) -----
-    if (array_length(global.kd_owned) > 0)
+    // ----- weapon slot: only the weapon in your hand (keys 1-9, 0, -, = still switch) -----
+    if (global.kd_weapon != "")
     {
+        var _wp2    = kd_weapon_get(global.kd_weapon);
+        var _wb_s   = 48;
+        var _wb_bx  = 1280 - 16 - _wb_s;
+        var _wb_by  = _bar_y2 - _wb_s;
+        var _wb_a   = 1;
+        if (!global.kd_weapon_out) _wb_a = 0.45;          // holstered
+        draw_set_alpha(0.88);
+        draw_set_colour(make_colour_rgb(34, 58, 46));
+        draw_roundrect_ext(_wb_bx, _wb_by, _wb_bx + _wb_s, _wb_by + _wb_s, 8, 8, false);
+        draw_set_alpha(1);
+        draw_set_colour(_green);
+        draw_roundrect_ext(_wb_bx, _wb_by, _wb_bx + _wb_s, _wb_by + _wb_s, 8, 8, true);
+        // centre the weapon's visible pixels in the slot
+        var _wb_spr = _wp2.sprite;
+        var _wb_bw  = sprite_get_bbox_right(_wb_spr) - sprite_get_bbox_left(_wb_spr) + 1;
+        var _wb_bh  = sprite_get_bbox_bottom(_wb_spr) - sprite_get_bbox_top(_wb_spr) + 1;
+        var _wb_ss  = min(1.5, (_wb_s - 8) / _wb_bw);
+        var _wb_ox  = (sprite_get_bbox_left(_wb_spr) + _wb_bw / 2 - sprite_get_xoffset(_wb_spr)) * _wb_ss;
+        var _wb_oy  = (sprite_get_bbox_top(_wb_spr) + _wb_bh / 2 - sprite_get_yoffset(_wb_spr)) * _wb_ss;
+        draw_sprite_ext(_wb_spr, 0, _wb_bx + _wb_s / 2 - _wb_ox, _wb_by + _wb_s / 2 + 3 - _wb_oy, _wb_ss, _wb_ss, 0, c_white, _wb_a);
+        // its key in the corner of the slot
         var _wb_order = kd_weapon_order();
         var _wb_lab   = kd_weapon_key_labels();
-        var _wb_n     = array_length(_wb_order);
-        var _wb_cols  = 6;
-        var _wb_s     = 36;
-        var _wb_g     = 4;
-        var _wb_rows  = ceil(_wb_n / _wb_cols);
-        var _wb_x1    = 1280 - 16 - (_wb_cols * _wb_s + (_wb_cols - 1) * _wb_g);
-        var _wb_y1    = _bar_y2 - (_wb_rows * _wb_s + (_wb_rows - 1) * _wb_g);
-        for (var _wi = 0; _wi < _wb_n; _wi++)
+        for (var _wi = 0; _wi < array_length(_wb_order); _wi++)
         {
-            var _wb_k   = _wb_order[_wi];
-            var _wp2    = kd_weapon_get(_wb_k);
-            var _wb_own = kd_weapon_owned(_wb_k);
-            var _wb_cur = (global.kd_weapon == _wb_k);
-            var _wb_bx  = _wb_x1 + (_wi mod _wb_cols) * (_wb_s + _wb_g);
-            var _wb_by  = _wb_y1 + (_wi div _wb_cols) * (_wb_s + _wb_g);
-            draw_set_alpha(0.88);
-            draw_set_colour(_dark);
-            if (_wb_cur) draw_set_colour(make_colour_rgb(34, 58, 46));
-            draw_roundrect_ext(_wb_bx, _wb_by, _wb_bx + _wb_s, _wb_by + _wb_s, 8, 8, false);
-            draw_set_alpha(1);
-            draw_set_colour(make_colour_rgb(60, 68, 84));
-            if (_wb_own) draw_set_colour(_grey);
-            if (_wb_cur) draw_set_colour(_green);
-            draw_roundrect_ext(_wb_bx, _wb_by, _wb_bx + _wb_s, _wb_by + _wb_s, 8, 8, true);
-            if (_wb_own)
-            {
-                // centre the weapon's visible pixels in the slot
-                var _wb_spr = _wp2.sprite;
-                var _wb_bw  = sprite_get_bbox_right(_wb_spr) - sprite_get_bbox_left(_wb_spr) + 1;
-                var _wb_bh  = sprite_get_bbox_bottom(_wb_spr) - sprite_get_bbox_top(_wb_spr) + 1;
-                var _wb_ss  = min(1, (_wb_s - 6) / _wb_bw);
-                var _wb_ox  = (sprite_get_bbox_left(_wb_spr) + _wb_bw / 2 - sprite_get_xoffset(_wb_spr)) * _wb_ss;
-                var _wb_oy  = (sprite_get_bbox_top(_wb_spr) + _wb_bh / 2 - sprite_get_yoffset(_wb_spr)) * _wb_ss;
-                var _wb_a   = 1;
-                if (_wb_cur && !global.kd_weapon_out) _wb_a = 0.45;
-                draw_sprite_ext(_wb_spr, 0, _wb_bx + _wb_s / 2 - _wb_ox, _wb_by + _wb_s / 2 + 3 - _wb_oy, _wb_ss, _wb_ss, 0, c_white, _wb_a);
-            }
-            else
-            {
-                draw_set_colour(make_colour_rgb(70, 78, 94));
-                draw_set_halign(fa_center);
-                draw_text(_wb_bx + _wb_s / 2, _wb_by + 9, "?");
-                draw_set_halign(fa_left);
-            }
-            draw_set_colour(_grey);
-            if (_wb_cur) draw_set_colour(_green);
-            draw_text_transformed(_wb_bx + 4, _wb_by + 1, _wb_lab[_wi], 0.65, 0.65, 0);
+            if (_wb_order[_wi] == global.kd_weapon) draw_text_transformed(_wb_bx + 5, _wb_by + 2, _wb_lab[_wi], 0.65, 0.65, 0);
         }
-        // current weapon name above the bar
-        if (global.kd_weapon != "")
-        {
-            var _wcur = kd_weapon_get(global.kd_weapon);
-            var _wtxt = _wcur.name;
-            if (!global.kd_weapon_out) _wtxt += "  (holstered - Q)";
-            draw_set_halign(fa_right);
-            draw_set_colour(c_white);
-            draw_text_transformed(1280 - 16, _wb_y1 - 22, _wtxt, 0.9, 0.9, 0);
-            draw_set_halign(fa_left);
-        }
+        // name to the left of the slot
+        var _wtxt = _wp2.name;
+        if (!global.kd_weapon_out) _wtxt += "  (holstered - Q)";
+        draw_set_halign(fa_right);
+        draw_set_valign(fa_middle);
+        draw_set_colour(c_white);
+        draw_text_transformed(_wb_bx - 10, _wb_by + _wb_s / 2, _wtxt, 0.9, 0.9, 0);
+        draw_set_halign(fa_left);
+        draw_set_valign(fa_top);
     }
 
     // big map goes over everything else in the HUD
@@ -768,6 +747,11 @@ if (select_open && !is_undefined(cz_look))
     draw_set_colour(_grey);
     draw_text(100, 654, "W/S = choose row    A/D = change    click swatches / arrows / presets    Esc = cancel");
 }
+
+// ---------- skill tree (K) ----------
+if (skills_open) kd_skilltree_draw();
+if (pets_open)   kd_pets_panel_draw();
+if (shop_open)   kd_shop_panel_draw();
 
 // ---------- toasts (top centre) ----------
 var _ty = 90;

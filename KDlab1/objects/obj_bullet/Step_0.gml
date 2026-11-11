@@ -82,6 +82,8 @@ if (_npc != noone)
     if (!_seen)
     {
         array_push(hit_list, _npc);
+        if (ignite > 0 && _npc.freeze <= 0 && irandom(99) < 15 * ignite) _npc.burn = max(_npc.burn, 120);
+        if (chill > 0 && irandom(99) < 12 * chill) { _npc.freeze = max(_npc.freeze, 90); _npc.burn = 0; }
         switch (kind)
         {
             case "rocket":

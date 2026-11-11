@@ -10,6 +10,16 @@ select_t += 1;
 global.mouse_over_ui = point_in_rectangle(_mx, _my, discord_btn[0], discord_btn[1], gear_btn[2], gear_btn[3])
                     || (kd_showcase_hovered() != noone);     // showcase links are clickable
 
+// K = skill tree
+if (global.kd_chip_flash > 0) global.kd_chip_flash -= 1;
+if (keyboard_check_pressed(ord("K")) && !chat_typing && !name_editing && !settings_open && !panel_open && !select_open && !pets_open && !shop_open)
+{
+    skills_open = !skills_open;
+    st_hover = "";
+    kd_sfx(skills_open ? snd_ui_open : snd_ui_close);
+}
+else if (skills_open) kd_skilltree_step(_mx, _my, _click);
+
 // shader flash fades out
 if (global.kd_flash > 0) global.kd_flash = max(0, global.kd_flash - 0.04);
 
@@ -21,7 +31,7 @@ if (keyboard_check_pressed(vk_f2) && !chat_typing && !name_editing)
     kd_sfx(snd_ui_click);
 }
 
-// M = lab map: corner -> big -> hidden
+// M = lab map: corner -> big -> minimised
 if (keyboard_check_pressed(ord("M")) && !chat_typing && !name_editing)
 {
     global.kd_minimap = (global.kd_minimap + 1) mod 3;
@@ -256,6 +266,14 @@ else if (select_open)
         kd_sfx(snd_ui_close);
     }
 }
+else if (pets_open)
+{
+    kd_pets_panel_step(_mx, _my, _click);
+}
+else if (shop_open)
+{
+    kd_shop_panel_step(_mx, _my, _click);
+}
 else if (panel_open)
 {
     if (panel.discord)
@@ -358,7 +376,7 @@ else
         kd_toast(_wp.desc, make_colour_rgb(255, 214, 90));
     }
     else if (!chat_typing && near_station != noone && keyboard_check_pressed(ord("E"))
-        && (near_station.station == "select" || kd_is_door(near_station.station)))
+        && (near_station.station == "select" || near_station.station == "pets" || near_station.station == "shop" || kd_is_door(near_station.station)))
     {
         // special stations: character select + doors between rooms
         var _s = near_station.station;
@@ -370,6 +388,8 @@ else
             cz_look = kd_look_copy(global.kd_look);
             cz_row  = 0;
         }
+        else if (_s == "pets") kd_pets_open();      // Robot Pet Bay
+        else if (_s == "shop") kd_shop_open();      // KD Item Shop
         else kd_use_door(_s);     // door_lab, door_select, door_range, door_roof, door_back (scr_kd_world)
     }
     else if (!chat_typing && near_station != noone && keyboard_check_pressed(ord("E")))
@@ -390,7 +410,7 @@ else
     }
 }
 
-global.ui_block = chat_typing || name_editing || settings_open || panel_open || select_open;
+global.ui_block = chat_typing || name_editing || settings_open || panel_open || select_open || skills_open || pets_open || shop_open;
 // a click that closed a menu should not also fire the gun: stay blocked until the button is released
 if (_was_blocked && mouse_check_button(mb_left)) global.ui_block = true;
 

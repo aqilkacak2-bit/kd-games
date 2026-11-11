@@ -5,7 +5,7 @@ var _blocked = variable_global_exists("ui_block") && global.ui_block;   // typin
 hurt_t += 1;
 if (invul > 0) invul -= 1;
 if (hit_flash > 0) hit_flash -= 1;
-if (hurt_t > 120 && hp < hp_max) hp = min(hp_max, hp + 0.25);
+if (hurt_t > 120 && hp < hp_max) hp = min(hp_max, hp + 0.25 * kd_regen_mult());   // skill: Second Wind
 
 // abilities: F = shield dome for ~3 s (blocks explosions), H = heal 40 HP
 if (shield_cd > 0) shield_cd -= 1;
@@ -13,13 +13,13 @@ if (heal_cd > 0) heal_cd -= 1;
 if (!_blocked && keyboard_check_pressed(ord("F")) && shield_cd <= 0)
 {
     shield_fx = kd_vfx_shield(id);
-    shield_cd = 8 * 60;
+    shield_cd = kd_shield_cd();          // skill: Firewall
 }
 if (!_blocked && keyboard_check_pressed(ord("H")) && heal_cd <= 0)
 {
-    hp = min(hp_max, hp + 40);
+    hp = min(hp_max, hp + kd_heal_amount());   // skill: Field Medic
     kd_vfx_heal(id);
-    heal_cd = 10 * 60;
+    heal_cd = kd_heal_cd();
 }
 
 // G = throw a grenade at the mouse; recoil spring from shooting downward
@@ -160,6 +160,15 @@ if (mode == "normal")
     if (on_ground && _jump) { vsp = -jump_speed; kd_sfx(snd_jump, 0.05, 0.8); }
     var _was_ground = on_ground;
     var _fall_speed = vsp;
+    // jetpack: hold SPACE in the air to fly (unlocked in the skill tree)
+    jet_on = false;
+    if (kd_skill_has("jetpack") && !on_ground && !_blocked && !_jump && keyboard_check(vk_space) && jet_fuel > 0)
+    {
+        jet_on   = true;
+        vsp      = max(vsp - 0.55, -2.4);
+        jet_fuel = max(0, jet_fuel - 1);
+    }
+    if (on_ground) jet_fuel = min(jet_fuel_max, jet_fuel + 2);
     vsp = min(vsp + grav, max_fall);
 
     // horizontal collision
@@ -357,3 +366,22 @@ if (state == "walk" && anim_frame != step_prev_frame && (anim_frame == 1 || anim
     else if (mode == "ladder")         kd_sfx(snd_step, 0.25, 0.3);
 }
 step_prev_frame = anim_frame;
+
+// dust / colour trail behind the feet
+kd_trail_step(id);
+
+// jetpack flame: smoke puffs + engine sound
+if (mode != "normal") jet_on = false;
+jet_t += 1;
+if (jet_on)
+{
+    if (jet_t mod 3 == 0)
+    {
+        var _jp = instance_create_depth(x - facing * 6 + random_range(-2, 2), y - 4, depth + 1, obj_trail);
+        _jp.image_xscale = choose(-0.8, 0.8);
+        _jp.image_yscale = 0.8;
+        _jp.col  = choose(make_colour_rgb(160, 240, 80), make_colour_rgb(90, 200, 70), make_colour_rgb(170, 180, 170));
+        _jp.glow = true;
+    }
+    if (jet_t mod 7 == 0) kd_sfx_p(snd_dash, 0.45, 0.1, 0.22);
+}

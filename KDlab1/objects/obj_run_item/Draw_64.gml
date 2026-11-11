@@ -1,0 +1,24 @@
+/// obj_run_item - Draw GUI: what the item does, when you stand next to it
+if (!near) exit;
+var _d = kd_run_item_def(key);
+var _w = 460;
+var _x1 = 640 - _w / 2;
+var _y1 = 130;
+draw_set_font(KD_FONT_TEXT);
+draw_set_valign(fa_top);
+draw_set_alpha(0.92);
+draw_set_colour(make_colour_rgb(12, 8, 32));
+draw_roundrect_ext(_x1, _y1, _x1 + _w, _y1 + 92, 12, 12, false);
+draw_set_alpha(1);
+draw_set_colour(_d.col);
+draw_roundrect_ext(_x1, _y1, _x1 + _w, _y1 + 92, 12, 12, true);
+draw_sprite_ext(spr_run_items, _d.icon, _x1 + 36, _y1 + 46, 3, 3, 0, c_white, 1);
+kd_title_text(_x1 + 70, _y1 + 12, _d.name, 1.2, 1.2, 0);
+draw_set_colour(c_white);
+draw_text_transformed(_x1 + 70, _y1 + 42, _d.desc, 0.8, 0.8, 0);
+var _n = kd_item_count(key);
+var _line = (price > 0) ? "[E] Buy for " + string(price) + " coins" : "[E] Take it";
+if (_n > 0) _line += "   (you have " + string(_n) + " - it stacks)";
+draw_set_colour((price > 0 && price > global.kd_run.coins) ? make_colour_rgb(255, 110, 110) : make_colour_rgb(64, 226, 110));
+draw_text_transformed(_x1 + 70, _y1 + 66, _line, 0.75, 0.75, 0);
+draw_set_colour(c_white);

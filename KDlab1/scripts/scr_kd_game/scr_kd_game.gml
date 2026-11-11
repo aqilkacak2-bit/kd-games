@@ -24,6 +24,7 @@ function kd_add_exp(_amount, _reason)
     {
         kd_toast("LEVEL UP!  You are now Level " + string(_new), make_colour_rgb(255, 214, 90));
         with (obj_player) kd_vfx_powerup(id);        // power-up.ts
+        kd_chips_add(3 * (_new - _old));             // chips for the skill tree
         kd_sfx(snd_levelup, 0);
         global.kd_flash = 0.45;          // shader white flash
     }
@@ -255,11 +256,16 @@ function kd_station_info(_id)
 /// display name for the interaction prompt
 function kd_station_name(_id)
 {
+    if (room == rm_lobby && _id == "door_lab")   return "Character Lab";
+    if (_id == "door_lobby") return "KD Lobby";
     if (room == rm_select && _id == "door_lab")  return "Showcase Hall";
     if (room == rm_showcase && _id == "door_select") return "Character Lab";
     if (room == rm_showcase && _id == "door_lab")    return "Out to Kuala Lumpur";
     if (room == rm_main && _id == "door_select") return "Out to the street (KL)";
     if (room == rm_kl && _id == "door_select")   return "Showcase Hall";
+    if (_id == "door_dungeon") return "Enter the Neon Dungeon";
+    if (_id == "pets") return "Robot Pet Bay";
+    if (_id == "shop") return "KD Item Shop";
     switch (_id)
     {
         case "about":  return "KrackedDevs";

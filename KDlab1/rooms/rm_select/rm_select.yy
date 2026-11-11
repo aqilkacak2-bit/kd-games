@@ -12,6 +12,7 @@
     {"name":"inst_286CCDAC","path":"rooms/rm_select/rm_select.yy",},
     {"name":"inst_D3B1B996","path":"rooms/rm_select/rm_select.yy",},
     {"name":"inst_FAF53A83","path":"rooms/rm_select/rm_select.yy",},
+    {"name":"inst_90EF4752","path":"rooms/rm_select/rm_select.yy",},
   ],
   "isDnd":false,
   "layers":[
@@ -22,6 +23,7 @@
         {"$GMRInstance":"v4","%Name":"inst_286CCDAC","colour":4294967295,"frozen":false,"hasCreationCode":false,"ignore":false,"imageIndex":0,"imageSpeed":1.0,"inheritCode":false,"inheritedItemId":null,"inheritItemSettings":false,"isDnd":false,"name":"inst_286CCDAC","objectId":{"name":"obj_solid","path":"objects/obj_solid/obj_solid.yy",},"properties":[],"resourceType":"GMRInstance","resourceVersion":"2.0","rotation":0.0,"scaleX":320.0,"scaleY":30.0,"x":0.0,"y":150.0,},
         {"$GMRInstance":"v4","%Name":"inst_D3B1B996","colour":4294967295,"frozen":false,"hasCreationCode":false,"ignore":false,"imageIndex":0,"imageSpeed":1.0,"inheritCode":false,"inheritedItemId":null,"inheritItemSettings":false,"isDnd":false,"name":"inst_D3B1B996","objectId":{"name":"obj_station_select","path":"objects/obj_station_select/obj_station_select.yy",},"properties":[],"resourceType":"GMRInstance","resourceVersion":"2.0","rotation":0.0,"scaleX":1.0,"scaleY":1.0,"x":246.0,"y":150.0,},
         {"$GMRInstance":"v4","%Name":"inst_FAF53A83","colour":4294967295,"frozen":false,"hasCreationCode":false,"ignore":false,"imageIndex":0,"imageSpeed":1.0,"inheritCode":false,"inheritedItemId":null,"inheritItemSettings":false,"isDnd":false,"name":"inst_FAF53A83","objectId":{"name":"obj_station_door_lab","path":"objects/obj_station_door_lab/obj_station_door_lab.yy",},"properties":[],"resourceType":"GMRInstance","resourceVersion":"2.0","rotation":0.0,"scaleX":1.0,"scaleY":1.0,"x":300.0,"y":150.0,},
+        {"$GMRInstance":"v4","%Name":"inst_90EF4752","colour":4294967295,"frozen":false,"hasCreationCode":false,"ignore":false,"imageIndex":0,"imageSpeed":1.0,"inheritCode":false,"inheritedItemId":null,"inheritItemSettings":false,"isDnd":false,"name":"inst_90EF4752","objectId":{"name":"obj_station_door_lobby","path":"objects/obj_station_door_lobby/obj_station_door_lobby.yy",},"properties":[],"resourceType":"GMRInstance","resourceVersion":"2.0","rotation":0.0,"scaleX":1.0,"scaleY":1.0,"x":14.0,"y":150.0,},
       ],"layers":[],"name":"Instances","properties":[],"resourceType":"GMRInstanceLayer","resourceVersion":"2.0","userdefinedDepth":false,"visible":true,},
     {"$GMRBackgroundLayer":"","%Name":"Background","animationFPS":15.0,"animationSpeedType":0,"colour":4294967295,"depth":100,"effectEnabled":true,"effectType":null,"gridX":16,"gridY":16,"hierarchyFrozen":false,"hspeed":0.0,"htiled":false,"inheritLayerDepth":false,"inheritLayerSettings":false,"inheritSubLayers":true,"inheritVisibility":true,"layers":[],"name":"Background","properties":[],"resourceType":"GMRBackgroundLayer","resourceVersion":"2.0","spriteId":{"name":"spr_select_bg","path":"sprites/spr_select_bg/spr_select_bg.yy",},"stretch":false,"userdefinedAnimFPS":false,"userdefinedDepth":false,"visible":true,"vspeed":0.0,"vtiled":false,"x":0,"y":0,},
   ],

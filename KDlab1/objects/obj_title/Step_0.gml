@@ -14,7 +14,7 @@ for (var _i = 0; _i < array_length(walkers); _i++)
 if (starting)
 {
     fade = min(1, fade + 0.05);
-    if (fade >= 1) room_goto(rm_select);
+    if (fade >= 1) room_goto(rm_lobby);
     exit;
 }
 

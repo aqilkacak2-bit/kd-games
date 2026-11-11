@@ -1,6 +1,7 @@
 /// KDlab1 world: the rooms, doors between them, health, face icons and name plates.
 ///
 ///   rm_title    title screen (room 1)
+///   rm_lobby    KD Lobby (first room after the title screen)
 ///   rm_select   Character Lab
 ///   rm_main     KD Lab (office, control room, basement)
 ///   rm_range    Training Range (test dummies)
@@ -15,6 +16,7 @@ function kd_door_dest(_station)
     switch (_station)
     {
         case "door_lab":                                   // Character Lab -> Showcase -> street -> KD Lab
+            if (room == rm_lobby)    return rm_select;      // lobby lift -> Character Lab
             if (room == rm_select)   return rm_showcase;
             if (room == rm_showcase) return rm_kl;
             return rm_main;
@@ -22,9 +24,11 @@ function kd_door_dest(_station)
             if (room == rm_main) return rm_kl;
             if (room == rm_kl)   return rm_showcase;
             return rm_select;
+        case "door_lobby":  return rm_lobby;
         case "door_range":  return rm_range;
         case "door_roof":   return rm_rooftop;
         case "door_back":   return rm_main;
+        case "door_dungeon": return rm_dungeon;
     }
     return -1;
 }
@@ -39,6 +43,7 @@ function kd_use_door(_station)
 {
     var _dest = kd_door_dest(_station);
     if (_dest == -1) return;
+    if (_station == "door_dungeon") kd_run_start();      // new Neon Dungeon run
     global.kd_prev_room = room;
     kd_sfx(snd_door, 0.03);
     room_goto(_dest);
@@ -96,9 +101,10 @@ function kd_npc_damage(_npc, _dmg)
     with (_npc)
     {
         if (ko > 0) return;
-        hp = max(0, hp - _dmg);
+        hp = max(0, hp - _dmg * kd_dmg_mult());      // skill: Sharp Shooter
         if (hp <= 0)
         {
+            kd_chips_add(1);                         // a chip for every knock-out
             ko     = 240;
             burn   = 0;
             freeze = 0;
@@ -129,6 +135,7 @@ function kd_player_damage(_dmg, _sx, _sy)
         global.kd_flash = max(global.kd_flash, 0.15);
         if (hp <= 0)
         {
+            if (room == rm_dungeon) { hp = hp_max; kd_run_end(false); return; }
             hp  = hp_max;
             x   = xstart;
             y   = ystart;

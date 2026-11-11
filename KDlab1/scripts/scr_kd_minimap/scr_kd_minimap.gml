@@ -1,5 +1,5 @@
 /// <KD/> lab map - a little terminal window that shows the whole room as a green blueprint.
-/// M cycles: corner map -> big map -> hidden.
+/// M cycles: corner map -> big map -> minimised (a small tab).
 ///
 /// kd_minimap_draw(x2, y2, max_w, max_h, big)
 ///   small: the map's bottom-right corner sits at (x2, y2)
@@ -19,6 +19,8 @@ function kd_minimap_zones()
     }
     if (room == rm_range)   return [["TRAINING RANGE", 0, 20, 480, 150]];
     if (room == rm_showcase) return [["SHOWCASE HALL", 4, 20, 1069, 332]];
+    if (room == rm_lobby)   return [["KD LOBBY", 4, 20, 759, 308]];
+    if (room == rm_dungeon) return [["NEON DUNGEON", 8, 8, 472, 208]];
     if (room == rm_kl)      return [["JALAN BUKIT BINTANG", 8, 60, 470, 208], ["LRT TERRACE", 480, 90, 660, 120], ["KD LAB HQ", 700, 40, 940, 208]];
     if (room == rm_rooftop) return [["ROOFTOP", 0, 60, 480, 150]];
     return [["CHARACTER LAB", 0, 20, 320, 150]];
@@ -74,7 +76,9 @@ function kd_minimap_draw(_x2, _y2, _maxw, _maxh, _big)
     if (room == rm_range)   _file = "range.map";
     if (room == rm_rooftop) _file = "rooftop.map";
     if (room == rm_kl)      _file = "kuala_lumpur.map";
+    if (room == rm_dungeon) _file = "neon_dungeon.map";
     if (room == rm_showcase) _file = "showcase.map";
+    if (room == rm_lobby)   _file = "lobby.map";
     draw_set_valign(fa_middle);
     draw_set_colour(_green);
     draw_text_transformed(_x1 + 30, _ty, "<KD/> " + _file, _txs, _txs, 0);
@@ -285,4 +289,31 @@ function kd_minimap_draw(_x2, _y2, _maxw, _maxh, _big)
     draw_set_colour(c_white);
     draw_set_alpha(1);
     return _top;
+}
+
+/// the minimised map: a small tab in the corner. Returns the y of its top edge.
+function kd_minimap_mini_draw(_x2, _y2)
+{
+    var _green = make_colour_rgb(64, 226, 110);
+    var _w = 96;
+    var _h = 24;
+    var _x1 = _x2 - _w;
+    var _y1 = _y2 - _h;
+    draw_set_alpha(0.92);
+    draw_set_colour(make_colour_rgb(8, 17, 14));
+    draw_roundrect_ext(_x1, _y1, _x2, _y2, 10, 10, false);
+    draw_set_alpha(1);
+    draw_set_colour(_green);
+    draw_roundrect_ext(_x1, _y1, _x2, _y2, 10, 10, true);
+    var _ty = _y1 + _h / 2;
+    draw_set_colour(make_colour_rgb(235, 64, 80));  draw_circle(_x1 + 12, _ty, 3, false);
+    draw_set_colour(make_colour_rgb(255, 196, 60)); draw_circle(_x1 + 21, _ty, 3, false);
+    draw_set_colour(_green);                        draw_circle(_x1 + 30, _ty, 3, false);
+    draw_set_halign(fa_right);
+    draw_set_valign(fa_middle);
+    draw_text_transformed(_x2 - 10, _ty + 1, "MAP  M", 0.75, 0.75, 0);
+    draw_set_halign(fa_left);
+    draw_set_valign(fa_top);
+    draw_set_colour(c_white);
+    return _y1;
 }

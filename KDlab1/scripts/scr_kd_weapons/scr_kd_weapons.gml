@@ -283,14 +283,16 @@ function kd_gun_shoot()
     var _m  = kd_gun_muzzle();
     var _mx = _m[0];
     var _my = _m[1];
-    for (var _p = 0; _p < _w.pellets; _p++)
+    var _np  = _w.pellets + kd_item_count("multi");                 // item: Multithread
+    var _fan = (_w.pellets > 1) ? _w.spread : 5 * (_np - 1);
+    for (var _p = 0; _p < _np; _p++)
     {
         var _dir = aim_dir + random_range(-_w.spread, _w.spread);
         var _spd = _w.bullet_speed;
-        if (_w.pellets > 1)
+        if (_np > 1)
         {
             // fan the pellets evenly, with a little jitter
-            _dir = aim_dir + lerp(-_w.spread, _w.spread, _p / (_w.pellets - 1)) + random_range(-2, 2);
+            _dir = aim_dir + lerp(-_fan, _fan, _p / (_np - 1)) + random_range(-2, 2);
             _spd = _w.bullet_speed * random_range(0.9, 1.1);
         }
         var _b = instance_create_depth(_mx, _my, depth - 1, obj_bullet);
@@ -312,6 +314,13 @@ function kd_gun_shoot()
         _b.grav         = _w.grav;
         _b.image_blend  = _w.colour;
         _b.image_xscale = _w.bullet_scale;
+        // run items (Neon Dungeon)
+        if (_w.kind == "bullet") _b.bounces += kd_item_count("bouncy");
+        _b.pierce       += kd_item_count("bigdata");
+        _b.image_xscale *= 1 + 0.4 * kd_item_count("bigdata");
+        _b.image_yscale  = 1 + 0.4 * kd_item_count("bigdata");
+        _b.ignite        = kd_item_count("fire");
+        _b.chill         = kd_item_count("cryo");
     }
     muzzle_x = _mx;
     muzzle_y = _my;
@@ -486,6 +495,7 @@ function kd_npc_hit(_npc, _dir, _knock, _say, _dmg)
 function kd_explode(_x, _y, _r, _knock, _dmg)
 {
     if (is_undefined(_dmg)) _dmg = 40;
+    _r *= kd_blast_mult();                       // skill: Big Bang
     with (obj_kd_npc)
     {
         var _d = point_distance(_x, _y, x, y - 13);

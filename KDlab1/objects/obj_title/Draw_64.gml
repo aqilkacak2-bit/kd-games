@@ -63,7 +63,7 @@ for (var _i = 0; _i < array_length(walkers); _i++)
 
 // version line
 draw_set_colour(_grey);
-draw_text_transformed(16, 16, "KDlab1   |   12 weapons   |   7 rooms", 0.8, 0.8, 0);
+draw_text_transformed(16, 16, "KDlab1   |   12 weapons   |   Neon Dungeon", 0.8, 0.8, 0);
 
 // ---------- controls panel ----------
 if (show_controls)
@@ -91,7 +91,9 @@ if (show_controls)
         ["F", "Shield dome - blocks explosions (8 s cooldown)"],
         ["H", "Heal 40 HP (10 s cooldown)"],
         ["G", "Throw a grenade at the mouse (find more in boxes)"],
-        ["M", "Lab map: corner / big / hidden"],
+        ["M", "Lab map: corner / big / minimise"],
+        ["K", "Skill tree: spend chips on upgrades and trails"],
+        ["SPACE (hold)", "Fly with the jetpack (unlock it in the skill tree)"],
         ["T  or  ENTER", "Chat"],
         ["F2", "Change the screen shader"]
     ];

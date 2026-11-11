@@ -84,3 +84,15 @@ grenade_cd = 0;
 // shooting downward pops the character up a little (visual only)
 recoil_lift = 0;
 recoil_vel  = 0;
+
+// foot trail (spr_trail) + stats from the skill tree
+trail_t      = 0;
+trail_ground = true;
+trail_frame  = 0;
+kd_skills_apply(id);
+
+// jetpack (skill tree: Jetpack) - hold SPACE in the air
+jet_fuel_max = 120;          // steps of flying on a full tank (2 seconds)
+jet_fuel     = jet_fuel_max;
+jet_on       = false;
+jet_t        = 0;

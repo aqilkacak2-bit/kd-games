@@ -1,6 +1,6 @@
 /// KDlab1: hand grenades (G), recoil when shooting downward, item boxes + pickups.
 
-#macro KD_GRENADE_MAX 9
+#macro KD_GRENADE_MAX kd_grenade_max()
 #macro KD_THROW_TIME 22          // steps for the whole throw animation
 
 // ================================================================ HAND GRENADES
@@ -177,6 +177,7 @@ function kd_item_pickup(_p, _it)
             break;
         default:
             kd_add_exp(25, "Found a dev bounty in a box");
+            kd_chips_add(2);
     }
     kd_sfx(snd_pickup, 0.05);
     with (_it) instance_destroy();

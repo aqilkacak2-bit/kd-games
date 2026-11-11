@@ -9,8 +9,9 @@ function kd_globals_init()
     if (!variable_global_exists("kd_prev_room"))  global.kd_prev_room = -1;    // room you came from (doors)
     if (!variable_global_exists("kd_grenades"))   global.kd_grenades = 5;      // hand grenades (G), refill from item boxes
     if (!variable_global_exists("kd_arrive_fx"))  global.kd_arrive_fx = false; // power-up when you arrive after choosing a character
-    if (!variable_global_exists("kd_minimap"))    global.kd_minimap = 1;       // M: 1 = corner map, 2 = big map, 0 = hidden
+    if (!variable_global_exists("kd_minimap"))    global.kd_minimap = 1;       // M: 1 = corner map, 2 = big map, 0 = minimised
     if (!variable_global_exists("kd_shake"))      global.kd_shake = 0;         // screen shake from explosions
+    kd_skills_init();                                                         // chips, skill tree, trail
     if (!variable_global_exists("ui_block"))      global.ui_block = false;
     if (!variable_global_exists("mouse_over_ui")) global.mouse_over_ui = false;
 }

@@ -17,3 +17,5 @@ thrown      = false; // hand grenade (G): the fuse starts when it lands
 landed      = false;
 hit_list    = [];    // NPCs already hit (so a piercing bullet hits each person once)
 image_speed = 0;
+ignite      = 0;     // item Hot Fix: chance to set enemies on fire
+chill       = 0;     // item Cold Cache: chance to freeze
